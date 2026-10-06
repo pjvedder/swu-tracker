@@ -1,0 +1,2438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWU Collection Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0c12;
+    --surface: #111520;
+    --surface2: #181d2e;
+    --border: #252d45;
+    --accent: #3d7fff;
+    --accent2: #ffd700;
+    --green: #2ecc71;
+    --red: #e74c3c;
+    --yellow: #f39c12;
+    --text: #c8d6e5;
+    --text-dim: #5a6a85;
+    --font-head: 'Rajdhani', sans-serif;
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-body: 'Exo 2', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Starfield background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 70%, rgba(255,255,255,.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 60% 50%, rgba(255,255,255,.2) 0%, transparent 100%),
+      radial-gradient(2px 2px at 35% 15%, rgba(255,215,0,.3) 0%, transparent 100%),
+      radial-gradient(2px 2px at 75% 85%, rgba(61,127,255,.4) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative; z-index: 1;
+    padding: 2rem 2rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(61,127,255,.08) 0%, transparent 100%);
+  }
+  header h1 {
+    font-family: var(--font-head);
+    font-size: 2rem; font-weight: 700;
+    letter-spacing: .12em; text-transform: uppercase;
+    color: #fff;
+  }
+  header h1 span { color: var(--accent2); }
+  header p { color: var(--text-dim); font-size: .85rem; margin-top: .3rem; letter-spacing: .05em; }
+
+  .main { position: relative; z-index: 1; padding: 1.5rem 2rem; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 2.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    background: var(--surface);
+    margin-bottom: 1.5rem;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(61,127,255,.06);
+  }
+  .upload-zone .icon { font-size: 2.5rem; margin-bottom: .5rem; }
+  .upload-zone h3 { font-family: var(--font-head); font-size: 1.1rem; letter-spacing: .1em; text-transform: uppercase; }
+  .upload-zone p { color: var(--text-dim); font-size: .8rem; margin-top: .3rem; }
+  .upload-zone input { display: none; }
+
+  /* Status bar */
+  #status-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .75rem 1rem;
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    margin-bottom: 1.5rem;
+    display: none;
+    color: var(--text-dim);
+  }
+  #status-bar.active { display: block; }
+  #status-bar .status-line { color: var(--accent); }
+
+  /* Summary cards */
+  #summary { display: none; margin-bottom: 1.5rem; }
+  #summary.active { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .stat-card .label { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .1em; }
+  .stat-card .value { font-family: var(--font-head); font-size: 2rem; font-weight: 700; color: #fff; margin: .2rem 0; }
+  .stat-card .sub { font-size: .75rem; color: var(--text-dim); }
+
+  /* Set summary table */
+  #set-summary { display: none; margin-bottom: 1.5rem; }
+  #set-summary.active { display: block; }
+
+  /* Controls */
+  #controls {
+    display: none;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  #controls.active { display: flex; }
+
+  .filter-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: .4rem .85rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    cursor: pointer;
+    letter-spacing: .05em;
+    transition: all .15s;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  select, input[type="text"], input[type="number"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: .4rem .75rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    outline: none;
+    transition: border-color .15s;
+  }
+  select:focus, input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+
+  #set-pills {
+    display: flex; flex-wrap: wrap; gap: .4rem;
+    padding: .5rem .75rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .set-pill-all, .set-pill {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    font-weight: 700;
+    padding: .2rem .55rem;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: .04em;
+    border: 1px solid transparent;
+    opacity: .45;
+    transition: opacity .15s, transform .1s;
+    user-select: none;
+  }
+  .set-pill-all {
+    background: var(--surface2);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .set-pill-all.active { opacity: 1; border-color: var(--accent); color: var(--accent); }
+  .set-pill.active { opacity: 1; }
+  .set-pill:hover, .set-pill-all:hover { opacity: .8; transform: translateY(-1px); }
+
+  .set-pill-op {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    font-weight: 700;
+    padding: .2rem .55rem;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: .04em;
+    border: 1px solid rgba(255,215,0,.4);
+    background: rgba(255,215,0,.08);
+    color: #c9a800;
+    opacity: .55;
+    transition: opacity .15s, transform .1s;
+    user-select: none;
+    margin-left: .4rem;
+  }
+  .set-pill-op.active { opacity: 1; border-color: #ffd700; color: #ffd700; }
+  .set-pill-op:hover { opacity: .85; transform: translateY(-1px); }
+
+  .set-pill-prestige {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    font-weight: 700;
+    padding: .2rem .55rem;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: .04em;
+    border: 1px solid rgba(155,89,182,.4);
+    background: rgba(155,89,182,.08);
+    color: #a569bd;
+    opacity: .55;
+    transition: opacity .15s, transform .1s;
+    user-select: none;
+    margin-left: .2rem;
+  }
+  .set-pill-prestige.active { opacity: 1; border-color: #a569bd; color: #c39bd3; }
+  .set-pill-prestige:hover { opacity: .85; transform: translateY(-1px); }
+
+  .set-pill-hs {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    font-weight: 700;
+    padding: .2rem .55rem;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: .04em;
+    border: 1px solid rgba(26,172,224,.4);
+    background: rgba(26,172,224,.08);
+    color: #4dcdf0;
+    opacity: .55;
+    transition: opacity .15s, transform .1s;
+    user-select: none;
+    margin-left: .2rem;
+  }
+  .set-pill-hs.active { opacity: 1; border-color: #1aace0; color: #4dcdf0; }
+  .set-pill-hs:hover { opacity: .85; transform: translateY(-1px); }
+
+  #controls-row2 {
+    display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+    padding: .5rem .75rem;
+  }
+  #reprint-toggle-wrap {
+    display: flex; align-items: center; gap: .4rem;
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #reprint-toggle-wrap input { cursor: pointer; accent-color: var(--accent); }
+
+  .spacer { flex: 1; }
+
+  .dl-btn {
+    background: linear-gradient(135deg, var(--accent), #2255cc);
+    border: none;
+    color: #fff;
+    padding: .5rem 1.2rem;
+    border-radius: 4px;
+    font-family: var(--font-head);
+    font-size: .85rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    cursor: pointer;
+    transition: opacity .15s;
+    text-transform: uppercase;
+  }
+  .dl-btn:hover { opacity: .85; }
+  .dl-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: none;
+  }
+  .table-wrap.active { display: block; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+
+  thead th {
+    background: var(--surface2);
+    padding: .6rem .75rem;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+    position: sticky; top: 0;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid var(--border);
+  }
+  thead th:hover { color: var(--accent); }
+  thead th.sorted { color: var(--accent2); }
+
+  tbody tr { border-bottom: 1px solid rgba(37,45,69,.5); transition: background .1s; }
+  tbody tr:hover { background: rgba(61,127,255,.05); }
+  tbody tr.band { background: rgba(255,255,255,.02); }
+  tbody tr.band:hover { background: rgba(61,127,255,.07); }
+
+  td { padding: .5rem .75rem; white-space: nowrap; }
+  td.name-col { white-space: normal; max-width: 260px; font-family: var(--font-body); }
+
+  .badge {
+    display: inline-block;
+    padding: .15rem .4rem;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    letter-spacing: .05em;
+    font-weight: 600;
+  }
+  .badge-complete { background: rgba(46,204,113,.15); color: #2ecc71; border: 1px solid rgba(46,204,113,.3); }
+  .badge-partial  { background: rgba(243,156,18,.12); color: #f39c12; border: 1px solid rgba(243,156,18,.3); }
+  .badge-missing  { background: rgba(231,76,60,.12);  color: #e74c3c; border: 1px solid rgba(231,76,60,.3); }
+
+  .check { color: var(--green); font-size: .9rem; }
+  .rarity-C { color: #aaa; }
+  .rarity-U { color: #7eb8f7; }
+  .rarity-R { color: #c9a227; }
+  .rarity-L { color: #e67e22; }
+  .rarity-S { color: #9b59b6; }
+
+  /* Card image tooltip */
+  .card-tooltip-wrap {
+    position: relative;
+    display: inline-block;
+    cursor: default;
+  }
+  .card-tooltip {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    filter: drop-shadow(0 4px 24px rgba(0,0,0,.7));
+  }
+  .card-tooltip img {
+    width: 200px;
+    border-radius: 8px;
+    display: block;
+  }
+  .card-tooltip-wrap:hover .card-tooltip {
+    display: block;
+  }
+
+  .set-tag {
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    font-weight: 700;
+    padding: .1rem .35rem;
+    border-radius: 3px;
+    letter-spacing: .04em;
+  }
+  .notice {
+    margin: -.5rem 0 1rem; padding: .6rem .9rem; border-radius: 6px;
+    border: 1px solid rgba(242,184,0,.45); background: rgba(242,184,0,.08);
+    color: #f2c840; font-size: .8rem; line-height: 1.5;
+  }
+  .notice code { font-family: var(--font-mono); font-size: .75rem; }
+  .saved-row { display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; margin:-.5rem 0 1rem; font-size:.8rem; color: var(--text-dim); }
+  .link-btn { background:none; border:1px solid var(--border); color: var(--text); padding:.25rem .6rem; border-radius:4px; cursor:pointer; font: inherit; font-size:.75rem; }
+  .link-btn:hover { border-color: var(--accent); }
+
+  /* Prices + buying */
+  .price-col { font-family: var(--font-mono); font-size: .75rem; white-space: nowrap; }
+  .price-col a { color: var(--text); text-decoration: none; border-bottom: 1px dotted var(--text-dim); }
+  .price-col a:hover { color: var(--accent); border-color: var(--accent); }
+  .price-need { display:block; color: var(--text-dim); font-size: .65rem; }
+  #max-price { width: 6.5rem; }
+  #max-price:disabled { opacity: .45; cursor: not-allowed; }
+  .buy-btn {
+    background: transparent; border: 1px solid var(--accent2); color: var(--accent2);
+    font-family: var(--font-head); font-weight: 700; letter-spacing: .04em; font-size: .85rem;
+    padding: .45rem .9rem; border-radius: 4px; cursor: pointer;
+  }
+  .buy-btn:hover { background: rgba(255,215,0,.08); }
+  .buy-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .cost-cell { font-family: var(--font-mono); font-size: .8rem; white-space: nowrap; }
+  .cost-cell small { display:block; color: var(--text-dim); font-size: .65rem; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(5,7,12,.75); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .modal-backdrop[hidden] { display: none; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; width: min(640px, 100%); max-height: 90vh; display: flex; flex-direction: column; gap: .75rem; padding: 1.25rem; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+  .modal h2 { font-family: var(--font-head); font-size: 1.3rem; letter-spacing: .03em; color: var(--accent2); }
+  .modal p { font-size: .8rem; line-height: 1.5; color: var(--text); }
+  .modal .dim { color: var(--text-dim); }
+  .modal textarea { width: 100%; min-height: 260px; flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: .6rem; font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; resize: vertical; }
+  .modal-actions { display: flex; gap: .5rem; justify-content: flex-end; flex-wrap: wrap; }
+  .modal-actions .primary { background: var(--accent); border: 1px solid var(--accent); color: #fff; }
+  .modal button { font: inherit; font-size: .8rem; padding: .45rem .9rem; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .modal button:hover { border-color: var(--accent); }
+  .modal button:focus-visible, .buy-btn:focus-visible, .link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Per-set colour classes (.set-XXX) are generated from SETS in the script */
+
+  .op-sub-tag {
+    font-family: var(--font-mono);
+    font-size: .55rem;
+    font-weight: 700;
+    padding: .05rem .3rem;
+    border-radius: 2px;
+    letter-spacing: .06em;
+    opacity: .85;
+    border-style: dashed;
+  }
+  .op-sub-tag.op-type-SH {
+    background: rgba(200,160,0,.15) !important;
+    border-color: rgba(200,160,0,.5) !important;
+    color: #c8a000 !important;
+  }
+
+  .num-col { font-family: var(--font-mono); color: var(--text-dim); }
+
+  /* Progress bar in set summary */
+  .prog-bar { width: 100%; height: 4px; background: var(--border); border-radius: 2px; margin-top: 4px; }
+  .prog-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .5s ease; }
+  .prog-fill.complete { background: var(--green); }
+
+  /* Set summary table */
+  .set-tbl { width: 100%; border-collapse: collapse; }
+  .set-tbl th { background: var(--surface2); padding: .5rem .75rem; font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); text-align: left; }
+  .set-tbl td { padding: .5rem .75rem; border-bottom: 1px solid rgba(37,45,69,.4); font-size: .8rem; }
+  .set-tbl tr:hover td { background: rgba(61,127,255,.05); }
+
+  .row-count { color: var(--text-dim); font-family: var(--font-mono); font-size: .75rem; padding: .5rem 0; }
+
+  /* Loading spinner */
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    vertical-align: middle; margin-right: .4rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Pagination */
+  #pagination { display: flex; gap: .5rem; align-items: center; margin-top: 1rem; font-family: var(--font-mono); font-size: .75rem; flex-wrap: wrap; }
+  .page-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: .3rem .6rem; border-radius: 4px; cursor: pointer; transition: all .15s; }
+  .page-btn:hover { border-color: var(--accent); }
+  .page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .page-info { color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ SWU <span>Collection Tracker</span></h1>
+  <p>Upload your SWUDB export · Merges with live card database · Shows every card including 0-copy gaps</p>
+</header>
+
+<div class="main">
+
+  <div class="upload-zone" id="dropzone">
+    <div class="icon">📂</div>
+    <h3>Drop your SWUDB CSV Export</h3>
+    <p>or click to browse · Export from swudb.com → Collection → Export</p>
+    <input type="file" id="file-input" accept=".csv,.json,.txt,.html,application/json,text/csv" multiple>
+  </div>
+
+  <div id="saved-row" class="saved-row" hidden>
+    <span id="saved-text"></span>
+    <button class="link-btn" id="forget-btn" type="button">Forget saved collection</button>
+  </div>
+
+  <div id="price-row" class="saved-row" hidden>
+    <span id="price-text"></span>
+    <button class="link-btn" id="price-refresh-btn" type="button">Refresh prices</button>
+  </div>
+
+  <div id="status-bar">
+    <span id="status-text">Ready</span>
+  </div>
+
+  <div id="notice" class="notice" hidden></div>
+
+  <div id="summary"></div>
+
+  <div id="set-summary-wrap" style="margin-bottom:1.5rem;display:none;">
+    <table class="set-tbl" id="set-tbl">
+      <thead><tr>
+        <th>Set</th><th>Set Name</th><th>Cards</th>
+        <th>Complete</th><th>Partial</th><th>Missing</th><th>% Done</th><th>To Complete</th>
+        <th>OP Cards</th><th>Prestige Cards</th><th>Hyperspace Cards</th>
+      </tr></thead>
+      <tbody id="set-tbl-body"></tbody>
+    </table>
+  </div>
+
+  <div id="controls">
+    <div id="set-pills">
+      <span class="set-pill-all active" id="sp-all" onclick="toggleSetPill('all')">All Sets</span>
+      <span id="set-pill-slot" style="display:contents"></span>
+      <span id="op-toggle-pill" class="set-pill-op" onclick="toggleOPOnly()">OP Only</span>
+      <span id="prestige-toggle-pill" class="set-pill-prestige" onclick="togglePrestigeOnly()">Prestige Only</span>
+      <span id="hs-toggle-pill" class="set-pill-hs" onclick="toggleHSOnly()">Hyperspace Only</span>
+    </div>
+    <div id="controls-row2">
+      <button class="filter-btn active" id="f-all">All</button>
+      <button class="filter-btn" id="f-not-playset">Not Playset</button>
+      <button class="filter-btn" id="f-missing">Missing</button>
+      <button class="filter-btn" id="f-partial">Partial</button>
+      <button class="filter-btn" id="f-complete">Complete</button>
+      <input type="text" id="search" placeholder="Search card name…" style="min-width:160px;">
+      <input type="number" id="max-price" placeholder="Max $ each" min="0" step="0.25" disabled title="Available once TCGplayer prices have loaded">
+      <label id="reprint-toggle-wrap">
+        <input type="checkbox" id="reprint-toggle"> Show Reprints
+      </label>
+      <div class="spacer"></div>
+      <button class="buy-btn" id="buy-btn" type="button" disabled title="Build a TCGplayer Mass Entry list from the cards currently showing">Buy what's showing</button>
+      <button class="dl-btn" id="dl-btn" disabled>Open in Google Sheets ↗</button>
+    </div>
+  </div>
+
+  <div class="row-count" id="row-count"></div>
+
+  <div class="table-wrap" id="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-col="set">Set</th>
+          <th data-col="number">#</th>
+          <th data-col="name">Card Name</th>
+          <th data-col="type">Type</th>
+          <th data-col="rarity">Rar</th>
+          <th data-col="goal">Goal</th>
+          <th data-col="owned">Owned</th>
+          <th data-col="status">Status</th>
+          <th data-col="priceSort">Price</th>
+          <th data-col="normal">Normal</th>
+          <th data-col="foil">Foil</th>
+          <th data-col="hs">Hyper-space</th>
+          <th data-col="prestige">Prestige</th>
+          <th data-col="op">OP</th>
+          <th data-col="opFoil">OP Foil</th>
+          <th data-col="reprint">Reprint</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+
+  <div id="pagination"></div>
+</div>
+
+<div class="modal-backdrop" id="buy-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="buy-title">
+    <h2 id="buy-title">Buy on TCGplayer</h2>
+    <p id="buy-summary"></p>
+    <textarea id="buy-list" spellcheck="false" aria-label="Mass Entry list"></textarea>
+    <p class="dim">Edit the list if you like. "Open Mass Entry" copies it and opens TCGplayer; if the box there is empty, paste it in. Choose Star Wars: Unlimited as the product line if asked.</p>
+    <div class="modal-actions">
+      <button type="button" id="buy-close">Close</button>
+      <button type="button" id="buy-copy">Copy list</button>
+      <button type="button" id="buy-open" class="primary">Open Mass Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- Daily price file (swu_prices.js) built by the GitHub Action, served next to this page. Optional. -->
+<script src="swu_prices.js" charset="utf-8" onerror="window.SWU_PRICE_FILE_MISSING = true"></script>
+<script>
+// ── Set configuration ────────────────────────────────────────────────────────
+// Adding a new set = adding ONE entry here. Everything else is derived.
+//   foil:   'number' → Foil shares the Normal card number (SOR/SHD/TWI)
+//           'name'   → Foil has its own number, matched by name (JTL/LOF/SEC)
+//           'none'   → no Foil variant in the set (LAW/ASH; Hyperfoil replaces it)
+//   op:     OP/Showdown set codes for this set ('…SH' codes are Store Showdown kits)
+//   opFoil: 'number' → Foil OP shares the OP number; 'name' → Foil OP is base# + 20
+//   color/text: set accent (tag background/border) and readable text colour
+const SETS = [
+  { code:'SOR', name:'Spark of Rebellion',       foil:'number', prestige:false, op:['SOROP','SORSH'], opFoil:'number', color:'#e8180c', text:'#f26c63' },
+  { code:'SHD', name:'Shadows of the Galaxy',    foil:'number', prestige:false, op:['SHDOP','SHDSH'], opFoil:'number', color:'#3b4fcc', text:'#8b9ef5' },
+  { code:'TWI', name:'Twilight of the Republic', foil:'number', prestige:false, op:['TWIOP','TWISH'], opFoil:'number', color:'#6b1520', text:'#d97080', alpha:[.25,.6] },
+  { code:'JTL', name:'Jump to Lightspeed',       foil:'name',   prestige:true,  op:['JTLP'],          opFoil:'name',   color:'#f2b800', text:'#f2c840', alpha:[.15,.5] },
+  { code:'LOF', name:'Legends of the Force',     foil:'name',   prestige:true,  op:['LOFP'],          opFoil:'name',   color:'#1aace0', text:'#4dcdf0', alpha:[.15,.5] },
+  { code:'SEC', name:'Secrets of Power',         foil:'name',   prestige:true,  op:['SECP'],          opFoil:'name',   color:'#8b2fc9', text:'#c47eef' },
+  { code:'LAW', name:'A Lawless Time',           foil:'none',   prestige:true,  op:['LAWP'],          opFoil:'name',   color:'#f26a00', text:'#f59040', alpha:[.15,.5] },
+  { code:'ASH', name:'Ashes of the Empire',      foil:'none',   prestige:true,  op:['ASHP'],          opFoil:'name',   color:'#5f8a2e', text:'#9fcb62' },
+];
+
+// Promo / prize sets in SWUDB exports that this tracker deliberately skips
+const IGNORED_SETS = new Set(['SHDPR','TWIPR','P25','P26']);
+
+// ── Derived lookups (don't edit — change SETS above instead) ──────────────────
+const MAIN_SETS       = SETS.map(x => x.code);
+const SET_NAMES       = Object.fromEntries(SETS.map(x => [x.code, x.name]));
+const FOIL_BY_NUMBER  = new Set(SETS.filter(x => x.foil === 'number').map(x => x.code));
+const FOIL_BY_NAME    = new Set(SETS.filter(x => x.foil === 'name').map(x => x.code));
+const PRESTIGE_SETS   = new Set(SETS.filter(x => x.prestige).map(x => x.code));
+const OP_SETS_FOR     = Object.fromEntries(SETS.map(x => [x.code, x.op]));
+const OP_SET_ORDER    = SETS.flatMap(x => x.op);   // grouped by parent, OP kit before Showdown
+const OP_SET_LABEL    = Object.fromEntries(OP_SET_ORDER.map(c => [c, /SH$/.test(c) ? 'SH' : 'OP']));
+const OP_FOIL_BY_NAME = new Set(SETS.filter(x => x.opFoil === 'name').flatMap(x => x.op));
+const KNOWN_SET_CODES = new Set([...MAIN_SETS, ...OP_SET_ORDER, ...IGNORED_SETS]);
+
+// Inject the per-set colour classes used by tags and pills
+(function injectSetStyles() {
+  const rgb = hex => [1,3,5].map(i => parseInt(hex.slice(i, i+2), 16)).join(',');
+  const css = SETS.map(x => {
+    const [bgA, bdA] = x.alpha || [.18, .5];
+    return `.set-${x.code}{background:rgba(${rgb(x.color)},${bgA});border:1px solid rgba(${rgb(x.color)},${bdA});color:${x.text};}`;
+  }).join('\n');
+  const el = document.createElement('style');
+  el.textContent = css;
+  document.head.appendChild(el);
+})();
+
+// Build the per-set filter pills
+(function renderSetPills() {
+  document.getElementById('set-pill-slot').outerHTML = SETS.map(x =>
+    `<span class="set-pill set-${x.code}" id="sp-${x.code}" title="${x.name}" onclick="toggleSetPill('${x.code}')">${x.code}</span>`
+  ).join('\n      ');
+})();
+
+// Which printings count toward a card's playset. Every version of a card is a
+// legal copy, so all are on; flip one to false to stop counting it.
+//   promos: copies from promo/prize sets (P25, P26, MV26…), matched by card name
+//           and credited to the card's first appearance among the tracked sets
+const PLAYSET_COUNTS = { hyperspace: true, prestige: true, op: true, promos: true };
+
+const HS_VARIANTS  = new Set(['Hyperspace','Hyperfoil']);
+const PRES_VARIANTS= new Set(['Prestige']);
+
+// Hardcoded sizes for SH (Store Showdown) sets — these have fixed small counts
+// regardless of what card numbers SWUDB assigns (which can be mis-numbered)
+const SH_SET_SIZE = {
+  SORSH: 2, SHDSH: 2, TWISH: 2
+};
+// Remap mis-numbered SH cards to their correct slot (SWUDB data errors)
+const SH_NUM_REMAP = {
+  'TWISH': { '17': '2' }  // Gor, Grievous's Pet is card 2, not 17
+};
+const OP_PARENT = {};
+Object.entries(OP_SETS_FOR).forEach(([parent, ops]) =>
+  ops.forEach(op => { OP_PARENT[op] = parent; }));
+
+// ── State ────────────────────────────────────────────────────────────────────
+let masterCards = [];    // from swuapi
+let collectionAgg = {};  // aggregated from CSV: key=(set+num+vt) -> count etc.
+let trackerRows = [];    // merged result (main set cards)
+let opTrackerRows = [];  // OP master list (all slots per OP kit)
+let prestigeTrackerRows = []; // Prestige master list
+let hsTrackerRows = [];       // Hyperspace master list
+let filteredRows = [];
+let sortCol = 'set', sortDir = 1;
+let filterStatus = 'all', filterSets = new Set(), searchText = '';
+let showReprints = false, showOPOnly = false, showPrestigeOnly = false, showHSOnly = false;
+let currentPage = 1;
+let maxPrice = null;
+const PAGE_SIZE = 200;
+
+// ── Card image URL ────────────────────────────────────────────────────────────
+function cardImageUrl(r) {
+  if (r.opSet) return `https://cdn.swu-db.com/images/cards/${r.opSet}/${r.number}.png`;
+  if (r.isPrestige || r.isHS) return `https://cdn.swu-db.com/images/cards/${r.set}/${String(r.numInt).padStart(3,'0')}.png`;
+  if (r.imageUrl) return r.imageUrl;
+  return `https://cdn.swu-db.com/images/cards/${r.set}/${r.number.padStart(3,'0')}.png`;
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setStatus(msg, spinning=false) {
+  const bar = document.getElementById('status-bar');
+  const txt = document.getElementById('status-text');
+  bar.classList.add('active');
+  txt.innerHTML = (spinning ? '<span class="spinner"></span>' : '') + msg;
+}
+
+function rarityClass(r) {
+  if (r==='Common') return 'rarity-C';
+  if (r==='Uncommon') return 'rarity-U';
+  if (r==='Rare') return 'rarity-R';
+  if (r==='Legendary') return 'rarity-L';
+  return 'rarity-S';
+}
+function rarityAbbr(r) {
+  return {Common:'C',Uncommon:'U',Rare:'R',Legendary:'L',Special:'S'}[r] || r[0];
+}
+
+// ── CSV Parser ────────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.replace(/\r/g,'').split('\n');
+  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
+  const rows = [];
+  for (let i=1; i<lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    // Handle quoted fields
+    const cells = [];
+    let cur = '', inQ = false;
+    for (const ch of lines[i]) {
+      if (ch==='"') { inQ = !inQ; }
+      else if (ch===',' && !inQ) { cells.push(cur); cur=''; }
+      else cur += ch;
+    }
+    cells.push(cur);
+    const obj = {};
+    headers.forEach((h,i) => obj[h] = (cells[i]||'').trim());
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// ── Aggregate collection CSV ──────────────────────────────────────────────────
+function aggregateCollection(rows) {
+  const agg = {};
+  const opParentMap = {};
+  Object.entries(OP_SETS_FOR).forEach(([p,ops]) => ops.forEach(o => opParentMap[o]=p));
+
+  for (const r of rows) {
+    const s  = r.Set || '';
+    const vt = r.VariantType || '';
+    const num = (r.CardNumber||'').replace(/m$/,'').replace(/^0+/,'') || '0';
+    const key = `${s}||${num}||${vt}`;
+    if (!agg[key]) agg[key] = { set:s, num, vt, name:(r.CardName||'').trim(),
+                                 rarity:r.Rarity||'', count:0, stamps:new Set() };
+    agg[key].count += parseInt(r.Count||'0', 10);
+    if (r.Stamp) agg[key].stamps.add(r.Stamp);
+  }
+  return agg;
+}
+
+// ── Detect set codes this tracker doesn't know about ────────────────────────
+// Collection side: codes in the CSV that aren't configured or ignored
+function findUnknownCollectionSets(rows, knownNames = new Set()) {
+  const unknown = {};
+  for (const r of rows) {
+    const s = r.Set || '';
+    if (!s || KNOWN_SET_CODES.has(s)) continue;
+    if (PLAYSET_COUNTS.promos && knownNames.has((r.CardName || '').trim().toLowerCase())) continue; // counted as a promo copy
+    unknown[s] = (unknown[s] || 0) + (parseInt(r.Count || '0', 10) || 0);
+  }
+  return unknown; // code -> copies
+}
+// Card-database side: main sets in swuapi that aren't in SETS yet.
+// A "main set" here = a set code with 100+ Standard, non-token cards.
+function findNewSetsInDatabase(allCards) {
+  const counts = {};
+  for (const c of allCards) {
+    const s = c.setCode || '';
+    if (!s || KNOWN_SET_CODES.has(s)) continue;
+    if (c.variantType !== 'Standard' || /^Token/.test(c.type || '')) continue;
+    counts[s] = (counts[s] || 0) + 1;
+  }
+  return Object.entries(counts).filter(([, n]) => n >= 100).map(([s]) => s);
+}
+function showNotice(unknownInCsv, newInDb) {
+  const el = document.getElementById('notice');
+  const parts = [];
+  const csvCodes = Object.keys(unknownInCsv);
+  if (csvCodes.length) {
+    const list = csvCodes.map(c => `<code>${c}</code> (${unknownInCsv[c]} cop${unknownInCsv[c] === 1 ? 'y' : 'ies'})`).join(', ');
+    parts.push(`Your export includes cards from sets this tracker doesn't recognise, so they aren't counted: ${list}. Add them to <code>SETS</code> or <code>IGNORED_SETS</code> in the HTML file.`);
+  }
+  if (newInDb.length) {
+    parts.push(`The card database has new sets that aren't tracked yet: ${newInDb.map(c => `<code>${c}</code>`).join(', ')}. Add an entry to <code>SETS</code> to include them.`);
+  }
+  el.innerHTML = parts.join('<br>');
+  el.hidden = parts.length === 0;
+}
+
+// ── Build lookup indexes from aggregated collection ───────────────────────────
+function buildIndexes(agg) {
+  const playsetByNum  = {};   // (set,num) -> Normal+Foil-by-number count
+  const normalCt      = {};
+  const foilByNumCt   = {};
+  const foilByNameCt  = {};   // (set,name_lower) -> foil count (JTL/LOF/SEC)
+  const showcaseCt    = {};   // (set,name_lower)
+  const hsSet         = {};   // (set,name_lower) -> bool
+  const hsCt          = {};   // (set,name_lower) -> Hyperspace + Hyperfoil copies
+  const presCt        = {};   // (set,name_lower) -> Prestige copies
+  const promoCt       = {};   // name_lower -> copies from promo/unconfigured sets
+  const presSet       = {};   // (set,name_lower) -> bool
+  const opIdx         = {};   // (parent_set,name_lower) -> {nf,foil,stamps}
+
+  for (const [key, info] of Object.entries(agg)) {
+    const { set:s, num, vt, name, count } = info;
+    const nl = name.toLowerCase();
+    const snum = `${s}||${num}`;
+    const sname = `${s}||${nl}`;
+
+    if (MAIN_SETS.includes(s)) {
+      if (vt === 'Normal') {
+        playsetByNum[snum] = (playsetByNum[snum]||0) + count;
+        normalCt[snum]     = (normalCt[snum]||0) + count;
+      } else if (vt === 'Foil') {
+        if (FOIL_BY_NUMBER.has(s)) {
+          playsetByNum[snum] = (playsetByNum[snum]||0) + count;
+          foilByNumCt[snum]  = (foilByNumCt[snum]||0) + count;
+        } else if (FOIL_BY_NAME.has(s)) {
+          foilByNameCt[sname] = (foilByNameCt[sname]||0) + count;
+        }
+      } else if (vt === 'Showcase') {
+        showcaseCt[sname] = (showcaseCt[sname]||0) + count;
+      } else if (HS_VARIANTS.has(vt)) {
+        hsSet[sname] = true;
+        hsCt[sname]  = (hsCt[sname]||0) + count;
+      } else if (PRES_VARIANTS.has(vt)) {
+        presSet[sname] = true;
+        presCt[sname]  = (presCt[sname]||0) + count;
+      }
+    } else if (!OP_PARENT[s]) {
+      // Promo / prize / unconfigured set: credit by card name
+      promoCt[nl] = (promoCt[nl]||0) + count;
+    } else if (OP_PARENT[s] && !IGNORED_SETS.has(s)) {
+      const parent = OP_PARENT[s];
+      const ok = `${parent}||${nl}`;
+      if (!opIdx[ok]) opIdx[ok] = {nf:0, foil:0, stamps:new Set(), nums:[], foilNums:[], opSetCodes:[]};
+      if (!opIdx[ok].opSetCodes.includes(s)) opIdx[ok].opSetCodes.push(s);
+
+      const isFoilSplit  = OP_FOIL_BY_NAME.has(s); // JTL+: foil# is base#+20
+      const isFoilVariant = vt === 'Foil OP';
+
+      if (isFoilVariant) {
+        opIdx[ok].foil += count;
+        info.stamps.forEach(st => opIdx[ok].stamps.add(st));
+        if (isFoilSplit) {
+          // Don't add foil number to base nums — track separately
+          if (num && !opIdx[ok].foilNums.includes(num)) opIdx[ok].foilNums.push(num);
+        } else {
+          // Early sets: OP and Foil OP share same number
+          if (num && !opIdx[ok].nums.includes(num)) opIdx[ok].nums.push(num);
+        }
+      } else {
+        // OP or Hyperspace — always the base number
+        opIdx[ok].nf += count;
+        if (num && !opIdx[ok].nums.includes(num)) opIdx[ok].nums.push(num);
+      }
+    }
+  }
+  // Post-process: build opSets display strings, falling back to foilNums if no base num
+  for (const entry of Object.values(opIdx)) {
+    const displayNum = entry.nums.length
+      ? entry.nums[0].padStart(3,'0')
+      : (entry.foilNums.length ? entry.foilNums[0].padStart(3,'0') + '★' : '???');
+    entry.opSets = entry.opSetCodes.map(code => `${code}:${displayNum}`);
+    // Also store the resolved num for sorting
+    entry.sortNum = entry.nums.length
+      ? parseInt(entry.nums[0], 10)
+      : (entry.foilNums.length ? parseInt(entry.foilNums[0], 10) - 20 : 999);
+  }
+
+  return { playsetByNum, normalCt, foilByNumCt, foilByNameCt, showcaseCt, hsSet, hsCt, presSet, presCt, promoCt, opIdx };
+}
+
+// ── Build OP master rows (all slots per kit, owned or not) ───────────────────
+function buildOPTrackerRows(agg, opMaster) {
+  // Build owned data index keyed by (opSet, slot)
+  const opData    = {}; // `${opSet}||${slot}` -> {nf, foil, nums, foilNums}
+  const csvNames  = {}; // `${opSet}||${slot}` -> name from CSV (fallback)
+  const csvRarity = {};
+  const csvType   = {};
+  const csvMaxSlot = {}; // opSet -> highest base slot seen in CSV
+
+  for (const [, info] of Object.entries(agg)) {
+    const { set:s, num, vt, name, rarity } = info;
+    if (!OP_PARENT[s] || IGNORED_SETS.has(s)) continue;
+    const isFoilSplit = OP_FOIL_BY_NAME.has(s);
+    const isFoil = vt === 'Foil OP';
+    const rawBase = (isFoilSplit && isFoil) ? String(parseInt(num,10) - 20) : num;
+    // Apply remap for mis-numbered SH cards
+    const remappedBase = (SH_NUM_REMAP[s] && SH_NUM_REMAP[s][rawBase]) ? SH_NUM_REMAP[s][rawBase]
+                       : (SH_NUM_REMAP[s] && SH_NUM_REMAP[s][num])     ? SH_NUM_REMAP[s][num]
+                       : rawBase;
+    const bn = parseInt(remappedBase, 10);
+    if (bn < 1) continue;
+    const ok = `${s}||${bn}`;
+
+    // Track highest slot seen per OP set from CSV
+    if (!csvMaxSlot[s] || bn > csvMaxSlot[s]) csvMaxSlot[s] = bn;
+
+    if (!csvNames[ok]) {
+      csvNames[ok]  = name;
+      csvRarity[ok] = rarity || '';
+      csvType[ok]   = 'OP Card';
+    }
+
+    if (!opData[ok]) opData[ok] = {nf:0, foil:0, nums:[], foilNums:[]};
+    if (!isFoil || !isFoilSplit) {
+      if (!opData[ok].nums.includes(String(bn))) opData[ok].nums.push(String(bn));
+    }
+    if (isFoil) {
+      opData[ok].foil += info.count;
+      if (isFoilSplit && !opData[ok].foilNums.includes(num)) opData[ok].foilNums.push(num);
+    } else {
+      opData[ok].nf += info.count;
+    }
+  }
+
+  // Determine slot count per OP set: hardcoded for SH sets, otherwise max from API/CSV
+  function slotCount(opSet) {
+    if (SH_SET_SIZE[opSet]) return SH_SET_SIZE[opSet];
+    let apiMax = 0;
+    if (opMaster) {
+      for (const key of Object.keys(opMaster)) {
+        if (key.startsWith(`${opSet}||`)) {
+          const n = parseInt(key.split('||')[1], 10);
+          if (n > apiMax) apiMax = n;
+        }
+      }
+    }
+    const csvMax = csvMaxSlot[opSet] || 0;
+    const derived = Math.max(apiMax, csvMax);
+    return derived > 0 ? derived : 20;
+  }
+
+  const rows = [];
+  for (const [parent, opSets] of Object.entries(OP_SETS_FOR)) {
+    for (const opSet of opSets) {
+      const maxSlot = slotCount(opSet);
+      for (let slot = 1; slot <= maxSlot; slot++) {
+        const masterKey  = `${opSet}||${String(slot)}`;
+        const masterCard = opMaster && opMaster[masterKey];
+        const csvCard    = csvNames[masterKey] ? { name: csvNames[masterKey], rarity: csvRarity[masterKey], type: csvType[masterKey] } : null;
+        const card       = masterCard || csvCard;
+        const d = opData[masterKey] || {nf:0, foil:0, nums:[], foilNums:[]};
+        const totalOwned = d.nf + d.foil;
+        const slotStr = String(slot).padStart(3,'0');
+        rows.push({
+          set: parent, opSet, number: slotStr, numInt: slot,
+          name:     card ? card.name   : `(Unknown — ${opSet} #${slotStr})`,
+          rarity:   card ? card.rarity : '',
+          type:     card ? card.type   : 'OP Card',
+          isLeader: false, isBase: false, isReprint: false,
+          isUnknown: !card,
+          goal: 1, owned: Math.min(totalOwned, 1),
+          normCt: d.nf, foilCt: d.foil,
+          hasHS: false, hasPres: false,
+          opNF: d.nf, opFoil: d.foil,
+          opNums: d.nums, opFoilNums: d.foilNums,
+          opSets: [`${opSet}:${slotStr}`], opSetCodes: [opSet],
+          opSortNum: slot,
+          status: totalOwned > 0 ? 'Complete' : 'Missing',
+        });
+      }
+    }
+  }
+  return rows;
+}
+// ── Build Prestige tracker rows ───────────────────────────────────────────────
+function buildPrestigeTrackerRows(prestigeMaster, agg) {
+  // Build owned index from CSV keyed by set||name_lower (one row per unique card in CSV)
+  const ownedByName = {};
+  for (const [, info] of Object.entries(agg)) {
+    const { set:s, vt, name } = info;
+    if (!MAIN_SETS.includes(s) || vt !== 'Prestige') continue;
+    const key = `${s}||${name.toLowerCase()}`;
+    ownedByName[key] = (ownedByName[key] || 0) + info.count;
+  }
+
+  // Deduplicate master by name (belt-and-suspenders on top of fetchMasterCards dedup)
+  const seenNames = new Set();
+  const deduped = prestigeMaster.filter(c => {
+    const k = `${c.set}||${c.name.toLowerCase()}`;
+    if (seenNames.has(k)) return false;
+    seenNames.add(k);
+    return true;
+  });
+
+  return deduped.map(c => {
+    const key = `${c.set}||${c.name.toLowerCase()}`;
+    const owned = Math.min(ownedByName[key] || 0, 1);
+    return {
+      ...c,
+      isPrestige: true,
+      isReprint: false,
+      isUnknown: false,
+      goal: 1,
+      owned,
+      normCt: 0, foilCt: 0,
+      hasHS: false, hasPres: owned > 0,
+      opNF: 0, opFoil: 0, opNums: [], opFoilNums: [],
+      opSets: [], opSetCodes: [],
+      opSortNum: c.numInt,
+      isLeader: false, isBase: false,
+      status: owned > 0 ? 'Complete' : 'Missing',
+    };
+  });
+}
+
+// ── Build Hyperspace tracker rows ─────────────────────────────────────────────
+function buildHSTrackerRows(hsMaster, agg) {
+  // Build owned index from CSV keyed by set||name_lower
+  // Either Hyperspace or Hyperfoil ownership counts as having the card
+  const ownedByName = {};
+  for (const [, info] of Object.entries(agg)) {
+    const { set:s, vt, name } = info;
+    if (!MAIN_SETS.includes(s) || !HS_VARIANTS.has(vt)) continue;
+    const key = `${s}||${name.toLowerCase()}`;
+    ownedByName[key] = (ownedByName[key] || 0) + info.count;
+  }
+
+  // Deduplicate master by name (belt-and-suspenders)
+  const seenNames = new Set();
+  const deduped = hsMaster.filter(c => {
+    const k = `${c.set}||${c.name.toLowerCase()}`;
+    if (seenNames.has(k)) return false;
+    seenNames.add(k);
+    return true;
+  });
+
+  return deduped.map(c => {
+    const key = `${c.set}||${c.name.toLowerCase()}`;
+    const owned = Math.min(ownedByName[key] || 0, 1);
+    return {
+      ...c,
+      isHS: true,
+      isReprint: false,
+      isUnknown: false,
+      goal: 1,
+      owned,
+      normCt: 0, foilCt: 0,
+      hasHS: owned > 0, hasPres: false,
+      opNF: 0, opFoil: 0, opNums: [], opFoilNums: [],
+      opSets: [], opSetCodes: [],
+      opSortNum: c.numInt,
+      isLeader: false, isBase: false,
+      status: owned > 0 ? 'Complete' : 'Missing',
+    };
+  });
+}
+
+function buildOPMasterFromExport(exportCards) {
+  const ALL_OP_SETS = new Set(Object.values(OP_SETS_FOR).flat());
+  const opMaster = {};
+  for (const c of exportCards) {
+    const s = c.setCode || '';
+    if (!ALL_OP_SETS.has(s)) continue;
+    const isFoilSplit = OP_FOIL_BY_NAME.has(s);
+    const numRaw = String(c.cardNumber || '').replace(/^0+/,'');
+    const num = parseInt(numRaw, 10);
+    if (!num || num < 1) continue;
+    if (isFoilSplit && num > 20) continue;
+    const subtitle = c.subtitle ? `, ${c.subtitle}` : '';
+    const name = (c.name || '') + subtitle;
+    const key = `${s}||${String(num)}`;
+    if (!opMaster[key]) opMaster[key] = { name, rarity: c.rarity || '', type: c.type || 'OP Card' };
+  }
+  return opMaster;
+}
+
+// ── Fetch OP master from swu-db.com for all OP sets ───────────────────────────
+async function fetchOPMasterFromSwuDb() {
+  const ALL_OP_SETS = Object.values(OP_SETS_FOR).flat();
+  const results = await Promise.allSettled(
+    ALL_OP_SETS.map(s =>
+      fetch(`https://api.swu-db.com/cards/${s.toLowerCase()}`)
+        .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+        .then(data => ({ set: s, cards: Array.isArray(data) ? data : (data.data || data.cards || []) }))
+    )
+  );
+  const opMaster = {};
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    const { set: opSet, cards } = result.value;
+    const isFoilSplit = OP_FOIL_BY_NAME.has(opSet);
+    for (const c of cards) {
+      const numRaw = String(c.number || c.cardNumber || c.setnumber || '').replace(/^0+/,'');
+      const num = parseInt(numRaw, 10);
+      if (!num || num < 1) continue;
+      if (isFoilSplit && num > 20) continue;
+      const subtitle = c.subtitle ? `, ${c.subtitle}` : '';
+      const name = (c.name || '') + subtitle;
+      const key = `${opSet}||${String(num)}`;
+      if (!opMaster[key]) opMaster[key] = { name, rarity: c.rarity || '', type: c.type || 'OP Card' };
+    }
+  }
+  return opMaster;
+}
+
+// ── Fetch main set card list from swuapi.com ──────────────────────────────────
+async function fetchMasterCards() {
+  setStatus('Fetching complete card list from swuapi.com…', true);
+  const resp = await fetch('https://api.swuapi.com/export/all');
+  if (!resp.ok) throw new Error(`API error ${resp.status}`);
+  const data = await resp.json();
+  const allCards = data.cards || [];
+
+  const cards = [];
+  const prestigeCards = [];
+  const hsCards = [];
+  const seen  = new Set();
+  for (const c of allCards) {
+    const s  = c.setCode || '';
+    const vt = c.variantType || '';
+    if (!MAIN_SETS.includes(s)) continue;
+    if (['Token Unit','Token Upgrade'].includes(c.type)) continue;
+    const num = String(c.cardNumber || '').replace(/^0+/,'') || '0';
+
+    // Prestige variants: Standard Prestige, Foil Prestige, Serialized Prestige
+    // Dedup by name — each unique card may have 2-3 numbered variants
+    if (vt === 'Standard Prestige' || vt === 'Foil Prestige' || vt === 'Serialized Prestige') {
+      const subtitle = c.subtitle ? `, ${c.subtitle}` : '';
+      const name = (c.name||'') + subtitle;
+      const nameKey = `pres:${s}||${name.toLowerCase()}`;
+      if (!seen.has(nameKey)) {
+        seen.add(nameKey);
+        prestigeCards.push({
+          set: s, number: String(c.cardNumber || '').padStart(3,'0'),
+          numInt: parseInt(num, 10) || 0,
+          name,
+          rarity: c.rarity || '', type: c.type || '',
+          imageUrl: c.imageUrl || c.image || '',
+        });
+      } else if (vt === 'Standard Prestige') {
+        // If we already added a Foil/Serialized entry, replace with Standard's number
+        const existing = prestigeCards.findIndex(p => p.set === s && p.name.toLowerCase() === name.toLowerCase());
+        if (existing !== -1) {
+          prestigeCards[existing].number = String(c.cardNumber || '').padStart(3,'0');
+          prestigeCards[existing].numInt  = parseInt(num, 10) || 0;
+          prestigeCards[existing].imageUrl = c.imageUrl || c.image || prestigeCards[existing].imageUrl;
+        }
+      }
+      continue;
+    }
+
+    // Hyperspace / Hyperfoil — dedup by name+set
+    if (vt === 'Hyperspace' || vt === 'Hyperfoil') {
+      const subtitle = c.subtitle ? `, ${c.subtitle}` : '';
+      const name = (c.name||'') + subtitle;
+      const hsKey = `hs:${s}||${name.toLowerCase()}`;
+      if (!seen.has(hsKey)) {
+        seen.add(hsKey);
+        hsCards.push({
+          set: s, number: String(c.cardNumber || '').padStart(3,'0'),
+          numInt: parseInt(num, 10) || 0,
+          name,
+          rarity: c.rarity || '', type: c.type || '',
+          imageUrl: c.imageUrl || c.image || '',
+        });
+      } else if (vt === 'Hyperspace') {
+        // Prefer Hyperspace number over Hyperfoil for display
+        const existing = hsCards.findIndex(p => p.set === s && p.name.toLowerCase() === name.toLowerCase());
+        if (existing !== -1) {
+          hsCards[existing].number  = String(c.cardNumber || '').padStart(3,'0');
+          hsCards[existing].numInt  = parseInt(num, 10) || 0;
+          hsCards[existing].imageUrl = c.imageUrl || c.image || hsCards[existing].imageUrl;
+        }
+      }
+      continue;
+    }
+
+    // Main cards: Standard only
+    if (vt !== 'Standard') continue;
+    const key = `${s}||${num}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const subtitle = c.subtitle ? `, ${c.subtitle}` : '';
+    cards.push({
+      set:      s,
+      number:   String(c.cardNumber || ''),
+      numInt:   parseInt(String(c.cardNumber||'').replace(/\D/g,''), 10) || 0,
+      name:     (c.name||'') + subtitle,
+      rarity:   c.rarity || '',
+      type:     c.type || '',
+      isLeader: !!c.isLeader,
+      isBase:   !!c.isBase,
+      imageUrl: c.imageUrl || c.image || '',
+    });
+  }
+  const setOrder = Object.fromEntries(MAIN_SETS.map((s,i)=>[s,i]));
+  cards.sort((a,b) => (setOrder[a.set]-setOrder[b.set]) || (a.numInt-b.numInt));
+  prestigeCards.sort((a,b) => (setOrder[a.set]-setOrder[b.set]) || (a.numInt-b.numInt));
+  hsCards.sort((a,b) => (setOrder[a.set]-setOrder[b.set]) || (a.numInt-b.numInt));
+  return { cards, allCards, prestigeCards, hsCards };
+}
+
+// ── Build reprint map ─────────────────────────────────────────────────────────
+function buildReprintMap(cards) {
+  const setOrder = Object.fromEntries(MAIN_SETS.map((s,i)=>[s,i]));
+  const firstSeen = {};
+  const reprints  = new Set();
+  for (const c of cards) {
+    const nl = c.name.toLowerCase();
+    if (nl in firstSeen) {
+      if (setOrder[c.set] > firstSeen[nl]) reprints.add(`${c.set}||${c.number.replace(/^0+/,'')}`);
+    } else {
+      firstSeen[nl] = setOrder[c.set];
+    }
+  }
+  return reprints;
+}
+
+// ── Merge master + collection ─────────────────────────────────────────────────
+function mergeData(cards, agg) {
+  const idx     = buildIndexes(agg);
+  const reprints= buildReprintMap(cards);
+  const { playsetByNum, normalCt, foilByNumCt, foilByNameCt, showcaseCt,
+          hsSet, hsCt, presSet, presCt, promoCt, opIdx } = idx;
+  // Promo copies go to the card's first appearance among tracked sets
+  const firstSetByName = {};
+  for (const c of cards) {
+    const nl = c.name.toLowerCase();
+    if (!(nl in firstSetByName) || MAIN_SETS.indexOf(c.set) < MAIN_SETS.indexOf(firstSetByName[nl])) firstSetByName[nl] = c.set;
+  }
+
+  return cards.map(c => {
+    const s   = c.set;
+    const num = (c.number||'').replace(/^0+/,'') || '0';
+    const nl  = c.name.toLowerCase();
+    const snum  = `${s}||${num}`;
+    const sname = `${s}||${nl}`;
+
+    const goal  = (c.isLeader || c.isBase) ? 1 : 3;
+    const opKey0  = `${s}||${nl}`;
+    const opData0 = opIdx[opKey0] || { nf: 0, foil: 0 };
+    const hsCopies    = hsCt[sname] || 0;
+    const presCopies  = presCt[sname] || 0;
+    const opCopies    = opData0.nf + opData0.foil;
+    const promoCopies = firstSetByName[nl] === s ? (promoCt[nl] || 0) : 0;
+    const owned = (playsetByNum[snum]||0) +
+                  (foilByNameCt[sname]||0) +
+                  (showcaseCt[sname]||0) +
+                  (PLAYSET_COUNTS.hyperspace ? hsCopies : 0) +
+                  (PLAYSET_COUNTS.prestige ? presCopies : 0) +
+                  (PLAYSET_COUNTS.op ? opCopies : 0) +
+                  (PLAYSET_COUNTS.promos ? promoCopies : 0);
+    const normCt  = normalCt[snum] || 0;
+    const foilCt  = (foilByNumCt[snum]||0) + (foilByNameCt[sname]||0);
+    const hasHS   = !!hsSet[sname];
+    const hasPres = !!presSet[sname];
+    const opKey   = `${s}||${nl}`;
+    const opData  = opIdx[opKey] || {nf:0, foil:0, stamps:new Set(), nums:[], foilNums:[], opSets:[], opSetCodes:[], sortNum:999};
+    const isReprint = reprints.has(snum);
+
+    let status;
+    if (owned === 0)       status = 'Missing';
+    else if (owned >= goal) status = 'Complete';
+    else                   status = `${owned}/${goal}`;
+
+    return { ...c, goal, owned, normCt, foilCt, hasHS, hsCopies, presCopies, opCopies, promoCopies, hasPres,
+             opNF: opData.nf, opFoil: opData.foil, opNums: opData.nums,
+             opFoilNums: opData.foilNums, opSets: opData.opSets, opSetCodes: opData.opSetCodes,
+             opSortNum: opData.sortNum ?? 999,
+             isReprint, status, numNorm: num };
+  });
+}
+
+// ── Apply filters & sort ──────────────────────────────────────────────────────
+function applyFilters() {
+  const specialMode = showOPOnly ? 'op' : showPrestigeOnly ? 'prestige' : showHSOnly ? 'hs' : 'normal';
+  let rows = specialMode === 'op'       ? [...opTrackerRows]
+           : specialMode === 'prestige' ? [...prestigeTrackerRows]
+           : specialMode === 'hs'       ? [...hsTrackerRows]
+           : [...trackerRows];
+  if (specialMode === 'normal' && !showReprints) rows = rows.filter(r => !r.isReprint);
+  if (specialMode !== 'op' && maxPrice !== null) rows = rows.filter(r => r.price != null && r.price <= maxPrice);
+  if (filterSets.size > 0)    rows = rows.filter(r => filterSets.has(r.set));
+  if (searchText)             rows = rows.filter(r => r.name.toLowerCase().includes(searchText.toLowerCase()));
+  if (filterStatus === 'missing')     rows = rows.filter(r => r.status === 'Missing');
+  if (filterStatus === 'partial')     rows = rows.filter(r => r.status !== 'Missing' && r.status !== 'Complete');
+  if (filterStatus === 'complete')    rows = rows.filter(r => r.status === 'Complete');
+  if (filterStatus === 'not-playset') rows = rows.filter(r => r.status !== 'Complete');
+
+  const dir = sortDir;
+  const col = sortCol;
+  const setOrder = Object.fromEntries(MAIN_SETS.map((s,i)=>[s,i]));
+  const opSetOrder = Object.fromEntries(OP_SET_ORDER.map((s,i)=>[s,i]));
+  const numVal = r => showOPOnly && (r.opSortNum !== undefined && r.opSortNum !== 999)
+    ? r.opSortNum : r.numInt;
+  const opSetVal = r => {
+    if (!showOPOnly || !r.opSetCodes || !r.opSetCodes.length) return 999;
+    return Math.min(...r.opSetCodes.map(c => opSetOrder[c] ?? 999));
+  };
+  rows.sort((a,b) => {
+    let av = a[col], bv = b[col];
+    if (col==='set') { av = setOrder[a.set]; bv = setOrder[b.set]; }
+    if (col==='number') { av = numVal(a); bv = numVal(b); }
+    if (typeof av === 'string') return dir * av.localeCompare(bv);
+    return dir * ((av||0) - (bv||0));
+  });
+  // Re-sort: set first, then OP set (if OP Only), then user sort within
+  if (col !== 'set') {
+    rows.sort((a,b) => {
+      const setDiff = setOrder[a.set] - setOrder[b.set];
+      if (setDiff !== 0) return setDiff;
+      if (showOPOnly) {
+        const opDiff = opSetVal(a) - opSetVal(b);
+        if (opDiff !== 0) return opDiff;
+      }
+      return dir * (() => {
+        let av=a[col], bv=b[col];
+        if (col==='number') { av = numVal(a); bv = numVal(b); }
+        if (typeof av==='string') return av.localeCompare(bv);
+        return (av||0)-(bv||0);
+      })();
+    });
+  } else if (showOPOnly) {
+    // When sorting by set col with OP Only, sub-sort by OP set then number
+    rows.sort((a,b) => {
+      const setDiff = dir * (setOrder[a.set] - setOrder[b.set]);
+      if (setDiff !== 0) return setDiff;
+      const opDiff = dir * (opSetVal(a) - opSetVal(b));
+      if (opDiff !== 0) return opDiff;
+      return numVal(a) - numVal(b);
+    });
+  }
+  filteredRows = rows;
+  currentPage  = 1;
+  const buyBtn = document.getElementById('buy-btn');
+  buyBtn.disabled = specialMode === 'op' || !rows.some(r => r.need > 0);
+  buyBtn.title = specialMode === 'op'
+    ? 'Not available for OP cards yet: TCGplayer lists them as separate promo products'
+    : !rows.some(r => r.need > 0)
+      ? 'Nothing to buy: every card showing is already complete'
+      : 'Build a TCGplayer Mass Entry list from the cards currently showing';
+  renderTable();
+  renderPagination();
+  updateRowCount();
+}
+
+// ── Render table ──────────────────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const slice = filteredRows.slice(start, start + PAGE_SIZE);
+
+  let prevSet = '';
+  tbody.innerHTML = slice.map((r, i) => {
+    const band = (r.set !== prevSet) ? (prevSet = r.set, i%2===0 ? '' : 'band') : '';
+    const opNumStr = r.opSets && r.opSets.length
+      ? r.opSets.join(' / ')
+      : (r.opNums && r.opNums.length ? r.opNums.map(n=>n.padStart(3,'0')).join(', ') : '—');
+    const num = showOPOnly
+      ? `<span style="color:var(--accent2);font-size:.7rem" title="OP card number">${opNumStr}</span>`
+      : showPrestigeOnly
+        ? `<span style="color:#c39bd3;font-size:.7rem" title="Prestige card number">${r.number}</span>`
+        : showHSOnly
+          ? `<span style="color:#4dcdf0;font-size:.7rem" title="Hyperspace card number">${r.number}</span>`
+          : r.number.padStart(3,'0');
+    const statusCls = r.status==='Complete'?'badge-complete':r.status==='Missing'?'badge-missing':'badge-partial';
+    const statusLabel = r.status==='Complete' ? '✓ Complete' : r.status;
+    const reprintCell = r.isReprint ? '<span style="color:#7eb8f7;font-size:.8rem">↩ reprint</span>' : '';
+
+    // Build set tag
+    let setTag;
+    if (showOPOnly && r.opSetCodes && r.opSetCodes.length) {
+      const subBadges = r.opSetCodes.map(code => {
+        const label = OP_SET_LABEL[code] || code;
+        const typeClass = label === 'SH' ? 'op-type-SH' : 'op-type-OP';
+        return `<span class="op-sub-tag set-${r.set} ${typeClass}">${label}</span>`;
+      }).join('');
+      setTag = `<span class="set-tag set-${r.set}">${r.set}</span>${subBadges}`;
+    } else if (showPrestigeOnly) {
+      setTag = `<span class="set-tag set-${r.set}">${r.set}</span><span class="op-sub-tag" style="background:rgba(155,89,182,.15);border:1px dashed rgba(155,89,182,.5);color:#c39bd3">PR</span>`;
+    } else if (showHSOnly) {
+      setTag = `<span class="set-tag set-${r.set}">${r.set}</span><span class="op-sub-tag" style="background:rgba(26,172,224,.15);border:1px dashed rgba(26,172,224,.5);color:#4dcdf0">HS</span>`;
+    } else {
+      setTag = `<span class="set-tag set-${r.set}">${r.set}</span>`;
+    }
+    return `<tr class="${band}${r.isUnknown ? ' op-unknown' : ''}">
+      <td><span style="display:flex;flex-direction:column;gap:2px;align-items:flex-start">${setTag}</span></td>
+      <td class="num-col">${num}</td>
+      <td class="name-col" style="${r.isUnknown?'color:var(--text-dim);font-style:italic':''}">
+        <span class="card-tooltip-wrap" onmouseenter="positionTooltip(event,this)">
+          ${r.name}
+          <span class="card-tooltip"><img src="${cardImageUrl(r)}" alt="${r.name}" loading="lazy" onerror="this.parentElement.style.display='none'"></span>
+        </span>
+      </td>
+      <td style="color:var(--text-dim);font-size:.75rem">${r.type}</td>
+      <td class="${rarityClass(r.rarity)}" title="${r.rarity}">${rarityAbbr(r.rarity)}</td>
+      <td class="num-col">${r.goal}</td>
+      <td class="num-col" style="color:${r.owned>=r.goal?'var(--green)':r.owned>0?'var(--yellow)':'var(--red)'}">${r.owned}</td>
+      <td><span class="badge ${statusCls}">${statusLabel}</span></td>
+      <td class="price-col">${priceCell(r)}</td>
+      <td class="num-col">${r.normCt||''}</td>
+      <td class="num-col">${r.foilCt||''}</td>
+      <td>${r.hasHS  ?'<span class="check">✓</span>':''}</td>
+      <td>${r.hasPres?'<span class="check">✓</span>':''}</td>
+      <td>${r.opNF >0?'<span class="check">✓</span>':''}</td>
+      <td>${r.opFoil>0?'<span class="check" style="color:var(--accent2)">✓</span>':''}</td>
+      <td>${reprintCell}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPagination() {
+  const total = Math.ceil(filteredRows.length / PAGE_SIZE);
+  const pg = document.getElementById('pagination');
+  if (total <= 1) { pg.innerHTML=''; return; }
+  let html = '';
+  const prev = currentPage-1;
+  const next = currentPage+1;
+  if (prev>=1) html += `<button class="page-btn" onclick="gotoPage(${prev})">‹ Prev</button>`;
+  const start = Math.max(1, currentPage-2);
+  const end   = Math.min(total, currentPage+2);
+  for (let p=start; p<=end; p++) {
+    html += `<button class="page-btn ${p===currentPage?'active':''}" onclick="gotoPage(${p})">${p}</button>`;
+  }
+  if (next<=total) html += `<button class="page-btn" onclick="gotoPage(${next})">Next ›</button>`;
+  html += `<span class="page-info">Page ${currentPage} of ${total}</span>`;
+  pg.innerHTML = html;
+}
+
+function gotoPage(p) { currentPage=p; renderTable(); renderPagination(); window.scrollTo(0,0); }
+
+function updateRowCount() {
+  const total = showOPOnly      ? opTrackerRows.length
+              : showPrestigeOnly ? prestigeTrackerRows.length
+              : showHSOnly       ? hsTrackerRows.length
+              : trackerRows.length;
+  document.getElementById('row-count').textContent =
+    `Showing ${filteredRows.length.toLocaleString()} of ${total.toLocaleString()} cards`;
+}
+
+// ── Render summary ────────────────────────────────────────────────────────────
+function renderSummary() {
+  const base     = trackerRows.filter(r => !r.isReprint);
+  const total    = base.length;
+  const complete = base.filter(r=>r.status==='Complete').length;
+  const missing  = base.filter(r=>r.status==='Missing').length;
+  const notPlayset = base.filter(r=>r.status!=='Complete').length;
+  const cardsNeeded = base.reduce((sum,r) => {
+    if (r.status === 'Complete') return sum;
+    return sum + (r.goal - Math.min(r.owned, r.goal));
+  }, 0);
+  const hasHS    = base.filter(r=>r.hasHS).length;
+  const hasPres  = base.filter(r=>r.hasPres).length;
+  const pct      = total ? Math.round(complete/total*100) : 0;
+
+  const sum = document.getElementById('summary');
+  sum.innerHTML = [
+    {l:'Total Cards',        v:total,       s:`unique cards, ${MAIN_SETS.length} sets`},
+    {l:'Playsets Complete',  v:complete,    s:`${pct}% of collection`},
+    {l:'Not Playset',        v:notPlayset,  s:'unique cards incomplete'},
+    {l:'Cards Needed',       v:cardsNeeded, s:'total copies to complete'},
+    {l:'Missing',            v:missing,     s:'unique cards, 0 copies'},
+    {l:'Has Hyperspace',     v:hasHS,       s:`${Math.round(hasHS/total*100)}% coverage`},
+    ...(priceIndex ? [(() => {
+      const c = costOf(base);
+      return {l:'Cost to Complete', v:money(c.cost, true),
+              s: c.unpriced ? `${c.unpriced} needed card${c.unpriced===1?'':'s'} unpriced` : 'TCGplayer market price'};
+    })()] : []),
+  ].map(s=>`<div class="stat-card">
+    <div class="label">${s.l}</div>
+    <div class="value">${typeof s.v === 'number' ? s.v.toLocaleString() : s.v}</div>
+    <div class="sub">${s.s}</div>
+  </div>`).join('');
+  sum.classList.add('active');
+
+  // Set summary table (reprints excluded)
+  const setOrder = Object.fromEntries(MAIN_SETS.map((s,i)=>[s,i]));
+  const bySet = {};
+  for (const r of base) {
+    if (!bySet[r.set]) bySet[r.set] = {total:0,complete:0,partial:0,missing:0,hs:0,pres:0};
+    const b = bySet[r.set];
+    b.total++;
+    if (r.status==='Complete') b.complete++;
+    else if (r.status==='Missing') b.missing++;
+    else b.partial++;
+    if (r.hasHS) b.hs++;
+    if (r.hasPres) b.pres++;
+  }
+  const tbody = document.getElementById('set-tbl-body');
+
+  // OP stats per parent set from opTrackerRows
+  const opBySet = {};
+  for (const r of opTrackerRows) {
+    if (!opBySet[r.set]) opBySet[r.set] = {owned:0, total:0};
+    opBySet[r.set].total++;
+    if (r.status === 'Complete') opBySet[r.set].owned++;
+  }
+
+  // Prestige stats per set from prestigeTrackerRows
+  const presBySet = {};
+  for (const r of prestigeTrackerRows) {
+    if (!presBySet[r.set]) presBySet[r.set] = {owned:0, total:0};
+    presBySet[r.set].total++;
+    if (r.status === 'Complete') presBySet[r.set].owned++;
+  }
+
+  // Hyperspace stats per set from hsTrackerRows
+  const hsBySet = {};
+  for (const r of hsTrackerRows) {
+    if (!hsBySet[r.set]) hsBySet[r.set] = {owned:0, total:0};
+    hsBySet[r.set].total++;
+    if (r.status === 'Complete') hsBySet[r.set].owned++;
+  }
+
+  tbody.innerHTML = MAIN_SETS.map(s => {
+    const b = bySet[s] || {total:0,complete:0,partial:0,missing:0,hs:0,pres:0};
+    const pct = b.total ? Math.round(b.complete/b.total*100) : 0;
+    const cost = priceIndex ? costOf(base.filter(r => r.set === s)) : null;
+    const costCell = !cost ? '<span style="color:var(--text-dim);font-size:.75rem">—</span>'
+      : cost.need === 0 ? '<span style="color:var(--green)">Done</span>'
+      : cost.cost === 0 ? `<span style="color:var(--text-dim)">—</span><small>${cost.unpriced} unpriced</small>`
+      : `${money(cost.cost, true)}${cost.unpriced ? `<small>${cost.unpriced} unpriced</small>` : ''}`;
+    const op  = opBySet[s]  || {owned:0, total:0};
+    const prs = presBySet[s] || {owned:0, total:0};
+    const hs  = hsBySet[s]  || {owned:0, total:0};
+    const opPct  = op.total  ? Math.round(op.owned/op.total*100)   : 0;
+    const prsPct = prs.total ? Math.round(prs.owned/prs.total*100) : 0;
+    const hsPct  = hs.total  ? Math.round(hs.owned/hs.total*100)   : 0;
+    const progCell = (obj, pct) => obj.total
+      ? `<div style="font-family:var(--font-mono);font-size:.75rem;margin-bottom:2px">${obj.owned}/${obj.total} <span style="color:var(--text-dim)">(${pct}%)</span></div><div class="prog-bar"><div class="prog-fill${pct===100?' complete':''}" style="width:${pct}%"></div></div>`
+      : '<span style="color:var(--text-dim);font-size:.75rem">—</span>';
+    return `<tr>
+      <td><span class="set-tag set-${s}">${s}</span></td>
+      <td>${SET_NAMES[s]}</td>
+      <td class="num-col">${b.total}</td>
+      <td style="color:var(--green)">${b.complete}</td>
+      <td style="color:var(--yellow)">${b.partial}</td>
+      <td style="color:var(--red)">${b.missing}</td>
+      <td>
+        <div style="font-family:var(--font-mono);font-size:.75rem;margin-bottom:2px">${pct}%</div>
+        <div class="prog-bar"><div class="prog-fill${pct===100?' complete':''}" style="width:${pct}%"></div></div>
+      </td>
+      <td class="cost-cell">${costCell}</td>
+      <td>${progCell(op, opPct)}</td>
+      <td>${progCell(prs, prsPct)}</td>
+      <td>${progCell(hs, hsPct)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('set-summary-wrap').style.display = 'block';
+}
+
+// ── Open in Google Sheets (copy data for Claude to create) ───────────────────
+async function openInSheets() {
+  const btn = document.getElementById('dl-btn');
+  btn.disabled = true;
+  btn.textContent = 'Preparing data…';
+
+  try {
+    const data = buildSheetData();
+
+    // Encode as compact JSON and copy to clipboard
+    const payload = JSON.stringify(data);
+    await navigator.clipboard.writeText(payload);
+
+    btn.textContent = '✓ Copied! Paste into Claude';
+    setTimeout(() => { btn.textContent = 'Open in Google Sheets ↗'; btn.disabled = false; }, 4000);
+
+    // Show instruction toast
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#111520;border:1px solid #3d7fff;border-radius:8px;padding:1rem 1.5rem;color:#c8d6e5;font-family:Exo 2,sans-serif;font-size:.875rem;z-index:9999;max-width:420px;text-align:center;line-height:1.6;box-shadow:0 4px 24px rgba(0,0,0,.6)';
+    toast.innerHTML = '<strong style="color:#3d7fff">Collection data copied!</strong><br>Go to your Claude chat and paste it — Claude will create the Google Sheet for you.';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+
+  } catch(e) {
+    btn.textContent = 'Open in Google Sheets ↗';
+    btn.disabled = false;
+    alert('Could not copy to clipboard: ' + e.message);
+  }
+}
+
+function buildSheetData() {
+  const sheetRows = r => ({
+    set:      r.set,
+    number:   r.number.padStart ? r.number.padStart(3,'0') : r.number,
+    name:     r.name || '',
+    type:     r.type || '',
+    rarity:   r.rarity || '',
+    goal:     r.goal ?? '',
+    owned:    r.owned ?? '',
+    status:   r.status || '',
+    normal:   r.normCt || '',
+    foil:     r.foilCt || '',
+    hs:       r.hasHS   ? 'YES' : '',
+    prestige: r.hasPres ? 'YES' : '',
+    op:       r.opNF > 0 ? 'YES' : '',
+    op_foil:  r.opFoil > 0 ? 'YES' : '',
+    reprint:  r.isReprint ? 'YES' : '',
+    price:    r.price != null ? r.price : '',
+    cost_to_complete: r.price != null && r.need ? +(r.price * r.need).toFixed(2) : '',
+  });
+  const opRows = r => ({
+    set: r.set, op_set: r.opSet,
+    number: r.number, name: r.name || '',
+    rarity: r.rarity || '', owned: r.owned ?? '', status: r.status || '',
+    op: r.opNF > 0 ? 'YES' : '', op_foil: r.opFoil > 0 ? 'YES' : '',
+  });
+  const variantRows = r => ({
+    set: r.set, number: r.number, name: r.name || '',
+    type: r.type || '', rarity: r.rarity || '',
+    owned: r.owned ?? '', status: r.status || '',
+  });
+  return {
+    collection: trackerRows.filter(r => !r.isReprint).map(sheetRows),
+    op:         opTrackerRows.map(opRows),
+    prestige:   prestigeTrackerRows.map(variantRows),
+    hyperspace: hsTrackerRows.map(variantRows),
+  };
+}
+
+// ── TCGplayer prices (via tcgcsv.com, a free daily mirror of TCGplayer data) ──
+const TCG_CATEGORY_ID = 79;                       // Star Wars: Unlimited on TCGplayer
+const TCGCSV_BASE     = 'https://tcgcsv.com/tcgplayer';
+const PRICE_KEY       = 'swuTracker.prices.v5';
+const PRICE_MAX_AGE_H = 12;                       // tcgcsv refreshes once a day
+const MASS_ENTRY_URL  = 'https://www.tcgplayer.com/massentry';
+
+let priceIndex = null;  // `${set}||${num}` -> { p:price, u:url, n:tcgName, a:abbr, t:tcgNumber }
+let priceMeta  = null;  // { source:'tcgcsv'|'csv', updatedAt:ISO }
+
+const normName = s => (s || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]/g, '');
+// Special printings TCGplayer lists as separate products, e.g. "(Hyperspace)"
+const VARIANT_TAG = /\((?=[^)]*(hyperspace|hyperfoil|prestige|showcase|serial|foil|promo|prerelease|judge|oversized|alternate|alt art|stamped|event|weekly|championship))[^)]*\)/i;
+const isVariantName = s => VARIANT_TAG.test(s || '');
+function tcgNumber(v) {                              // "010/252", "SOR 010", "#10" -> 10
+  const head = String(v || '').split('/')[0];
+  const m = head.match(/(\d+)\s*[a-z]?\s*$/i) || head.match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+function money(v, round = false) {
+  if (v == null) return '—';
+  return v.toLocaleString(undefined, { style: 'currency', currency: 'USD',
+    minimumFractionDigits: round ? 0 : 2, maximumFractionDigits: round ? 0 : 2 });
+}
+
+// Robust CSV parser (quoted fields, escaped quotes, newlines inside quotes)
+function parseCSVFull(text) {
+  const rows = []; let row = [], cur = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"' && text[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') inQ = false;
+      else cur += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { row.push(cur); cur = ''; }
+    else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if (ch !== '\r') cur += ch;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  const headers = (rows.shift() || []).map(h => h.trim());
+  return rows.filter(r => r.length > 1).map(r => Object.fromEntries(headers.map((h, i) => [h, (r[i] || '').trim()])));
+}
+
+// Flat record: { groupId, abbr, name, number, url, subType, market, mid, low }
+function pickPrice(recs) {
+  const by = t => recs.find(r => (r.subType || '').toLowerCase() === t);
+  const r = by('normal') || recs[0];
+  const val = x => (x == null || x === '' || isNaN(+x) || +x <= 0) ? null : +x;
+  return val(r.market) ?? val(r.mid) ?? val(r.low);
+}
+
+// Turn flat product/price records into an index keyed by our set + card number.
+// TCGplayer groups are assigned to our sets by how many of their cards match
+// (name + number), so this works even if TCGplayer names a set differently.
+function buildPriceIndex(records, groupHints = {}) {
+  const diag = { records: records.length, products: 0, groups: 0, mappedGroups: 0, byNumber: 0, byName: 0, variants: 0 };
+  // Group printings (Normal/Foil price rows) into products
+  const byProduct = {};
+  for (const rec of records) {
+    if (!rec.name) continue;
+    const num = tcgNumber(rec.number);
+    const k = `${rec.groupId}|${rec.name}|${num}`;
+    (byProduct[k] = byProduct[k] || []).push({ ...rec, num });
+  }
+  const products = Object.values(byProduct).map(recs => {
+    const r = recs[0];
+    return { groupId: r.groupId, abbr: r.abbr || '', name: r.name, num: r.num, url: r.url || '',
+             nn: normName(r.name), variant: isVariantName(r.name), price: pickPrice(recs) };
+  });
+  diag.products = products.length;
+  diag.groups = new Set(products.map(p => p.groupId)).size;
+
+  // Which of our sets does each TCGplayer group belong to? Vote by card name
+  // (number agreement counts extra), then fall back to the group's own name.
+  const nameSets = {};
+  for (const r of [...trackerRows, ...prestigeTrackerRows, ...hsTrackerRows]) {
+    (nameSets[normName(r.name)] = nameSets[normName(r.name)] || new Set()).add(r.set);
+  }
+  const numSets = {};
+  for (const r of trackerRows) {
+    const k = `${normName(r.name)}|${parseInt(r.numNorm, 10)}`;
+    (numSets[k] = numSets[k] || new Set()).add(r.set);
+  }
+  const votes = {};
+  for (const p of products) {
+    const sets = nameSets[p.nn];
+    if (!sets) continue;
+    const exact = numSets[`${p.nn}|${p.num}`];
+    for (const s of sets) {
+      votes[p.groupId] = votes[p.groupId] || {};
+      votes[p.groupId][s] = (votes[p.groupId][s] || 0) + (exact && exact.has(s) ? 2 : 1) / sets.size;
+    }
+  }
+  const groupSet = { ...groupHints };
+  for (const [g, v] of Object.entries(votes)) {
+    const [best, n] = Object.entries(v).sort((a, b) => b[1] - a[1])[0];
+    if (n >= 5 || !groupSet[g]) groupSet[g] = best;
+  }
+  diag.mappedGroups = new Set(products.map(p => p.groupId).filter(g => groupSet[g])).size;
+
+  const idx = {};
+  const rank = (c, nn) => (c.variant ? 0 : 4) + (nn && c.nn === nn ? 2 : 0) + (c.price != null ? 1 : 0);
+  const setRows = {};
+  for (const r of trackerRows) (setRows[r.set] = setRows[r.set] || []).push(r);
+
+  // 1) Main cards: match by set + number (name must agree when possible), then by name
+  const bySetNum = {}, bySetName = {};
+  for (const p of products) {
+    const set = groupSet[p.groupId];
+    if (!set || p.price == null) continue;
+    if (p.num != null) (bySetNum[`${set}||${p.num}`] = bySetNum[`${set}||${p.num}`] || []).push(p);
+    if (!p.variant) (bySetName[`${set}||${p.nn}`] = bySetName[`${set}||${p.nn}`] || []).push(p);
+  }
+  const entry = p => ({ p: p.price, u: p.url, n: p.name, a: p.abbr, t: p.num != null ? String(p.num) : '' });
+  for (const r of trackerRows) {
+    const nn = normName(r.name);
+    const num = parseInt(r.numNorm, 10);
+    const byNum = (bySetNum[`${r.set}||${num}`] || []).filter(c => !c.variant && c.nn === nn);
+    let best = byNum.sort((a, b) => rank(b, nn) - rank(a, nn))[0];
+    if (best) diag.byNumber++;
+    else {
+      const byName = bySetName[`${r.set}||${nn}`] || [];
+      best = byName.sort((a, b) => a.price - b.price)[0];   // same card, cheapest plain printing
+      if (best) diag.byName++;
+    }
+    if (best) idx[`${r.set}||${num}`] = entry(best);
+  }
+
+  // 2) Prestige / Hyperspace printings, keyed by name: V||set||name||kind
+  //    Prefer the plain printing (not Foil / Serialized / Hyperfoil), then the cheapest.
+  for (const p of products) {
+    const set = groupSet[p.groupId];
+    const tag = ((p.name.match(/\(([^)]*)\)/) || [])[1] || '').toLowerCase();
+    if (!set || !tag || p.price == null) continue;
+    const kind = /prestige/.test(tag) ? 'prestige' : /hyper/.test(tag) ? 'hs' : null;
+    if (!kind) continue;
+    const plain = !/foil|serial/.test(tag);
+    const key = `V||${set}||${p.nn}||${kind}`;
+    const cur = idx[key];
+    if (!cur || (plain && !cur.plain) || (plain === cur.plain && p.price < cur.p)) {
+      if (!cur) diag.variants++;
+      idx[key] = { ...entry(p), plain };
+    }
+  }
+  console.info('[SWU tracker] price matching', diag);
+  buildPriceIndex.lastDiag = diag;
+  return idx;
+}
+
+// Which TCGplayer groups to fetch: ones whose name or abbreviation matches a set
+function groupsToFetch(groups) {
+  const skip = /pre-?release|promo|weekly|judge|convention|event|tournament|starter|deck|kit|bundle|gift|oversized|playmat/i;
+  const out = new Map();
+  for (const x of SETS) {
+    for (const g of groups) {
+      const abbrMatch = (g.abbreviation || '').toUpperCase() === x.code;
+      const nameMatch = normName(g.name).startsWith(normName(x.name));
+      if ((abbrMatch || nameMatch) && !skip.test(g.name)) out.set(g.groupId, g);
+    }
+  }
+  return [...out.values()];
+}
+function groupHintsFor(groups) {
+  const hints = {};
+  for (const g of groups) {
+    const x = SETS.find(x => (g.abbreviation || '').toUpperCase() === x.code || normName(g.name).startsWith(normName(x.name)));
+    if (x) hints[g.groupId] = x.code;
+  }
+  return hints;
+}
+
+async function fetchPricesFromTcgcsv() {
+  const getJSON = url => fetch(url).then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)));
+  const groups = (await getJSON(`${TCGCSV_BASE}/${TCG_CATEGORY_ID}/groups`)).results || [];
+  const wanted = groupsToFetch(groups);
+  if (!wanted.length) throw new Error('no matching sets on TCGplayer');
+  const records = [];
+  let failedGroups = 0;
+  await Promise.all(wanted.map(async g => {
+   try {
+    const [prods, prices] = await Promise.all([
+      getJSON(`${TCGCSV_BASE}/${TCG_CATEGORY_ID}/${g.groupId}/products`),
+      getJSON(`${TCGCSV_BASE}/${TCG_CATEGORY_ID}/${g.groupId}/prices`),
+    ]);
+    const priceRows = {};
+    for (const pr of prices.results || []) (priceRows[pr.productId] = priceRows[pr.productId] || []).push(pr);
+    for (const p of prods.results || []) {
+      const ext = Object.fromEntries((p.extendedData || []).map(e => [e.name, e.value]));
+      ext.Number = ext.Number ?? Object.entries(ext).find(([k]) => /number/i.test(k))?.[1];
+      for (const pr of priceRows[p.productId] || [{}]) {
+        records.push({ groupId: g.groupId, abbr: g.abbreviation, name: p.name, number: ext.Number,
+          url: p.url, subType: pr.subTypeName, market: pr.marketPrice, mid: pr.midPrice, low: pr.lowPrice });
+      }
+    }
+   } catch (e) { failedGroups++; console.warn(`[SWU tracker] skipped TCGplayer group ${g.name}:`, e); }
+  }));
+  if (!records.length) throw new Error(failedGroups ? `couldn't read any of the ${failedGroups} TCGplayer sets` : 'TCGplayer returned no cards');
+  return { records, hints: groupHintsFor(wanted), found: wanted.map(g => g.name) };
+}
+
+// Some sites don't allow pages opened from your computer (file://) to read their data.
+// Public "CORS relay" services fetch the page for us and pass it back with permission.
+// Only public card/price URLs ever go through them — never your collection.
+const CORS_RELAYS = [
+  { name: 'direct',      wrap: u => u },
+  { name: 'corsproxy.io', wrap: u => `https://corsproxy.io/?url=${encodeURIComponent(u)}` },
+  { name: 'allorigins',  wrap: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
+];
+let workingRelay = null;   // remember the first route that worked this session
+async function fetchJSONAnyRoute(url) {
+  const order = workingRelay ? [workingRelay, ...CORS_RELAYS.filter(r => r !== workingRelay)] : CORS_RELAYS;
+  let lastErr;
+  for (const relay of order) {
+    try {
+      const r = await fetch(relay.wrap(url));
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      workingRelay = relay;
+      return data;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+
+// Primary source: SWU-DB's card lists include TCGplayer market prices and product IDs.
+// (Same API the tracker already uses for OP cards, so the browser allows it.)
+// Add one set's SWU-DB card list to a price index
+function indexSwuDbCards(code, cards, idx) {
+  const num = v => { const m = String(v || '').match(/^0*(\d+)$/); return m ? parseInt(m[1], 10) : null; };
+  const price = c => {
+    for (const k of ['MarketPrice', 'LowPrice']) { const v = parseFloat(c[k]); if (v > 0) return v; }
+    return null;
+  };
+  const url = c => c.tcgplayerId ? `https://www.tcgplayer.com/product/${c.tcgplayerId}` : '';
+  let added = 0;
+  for (const c of cards) {
+    const p = price(c);
+    if (p == null) continue;
+    const vt = (c.VariantType || '').toLowerCase();
+    const full = c.Subtitle ? `${c.Name}, ${c.Subtitle}` : c.Name;
+    const tcgName = c.Subtitle ? `${c.Name} - ${c.Subtitle}` : c.Name;
+    if (vt === 'normal') {
+      const n = num(c.Number);                  // "059" (not "059F")
+      if (n != null) { idx[`${code}||${n}`] = { p, u: url(c), n: tcgName, a: '', t: String(n) }; added++; }
+      continue;
+    }
+    // Prestige / Hyperspace: prefer the plain printing, then the cheapest
+    const kind = vt.includes('prestige') ? 'prestige' : vt.includes('hyper') ? 'hs' : null;
+    if (!kind) continue;
+    const plain = !/foil|serial/.test(vt);
+    const key = `V||${code}||${normName(full)}||${kind}`;
+    const cur = idx[key];
+    if (!cur || (plain && !cur.plain) || (plain === cur.plain && p < cur.p)) {
+      if (!cur) added++;
+      idx[key] = { p, u: url(c), n: '', a: '', t: '', plain };
+    }
+  }
+  return added;
+}
+
+async function fetchPricesFromSwuDb(sets = SETS) {
+  const idx = {};
+  const failed = [];
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  // Free relays throttle bursts and time out on big sets, so go one set at a
+  // time and retry with a pause before giving up on a set.
+  const loadSet = async ({ code }, i) => {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      showPriceRow(`<span class="spinner"></span>Loading TCGplayer prices… set ${i + 1} of ${sets.length} (${code})` +
+        (attempt > 1 ? `, retry ${attempt - 1}` : ''), false);
+      try {
+        const cards = (await fetchJSONAnyRoute(`https://api.swu-db.com/cards/${code.toLowerCase()}`)).data || [];
+        indexSwuDbCards(code, cards, idx);
+        return;
+      } catch (e) {
+        console.warn(`[SWU tracker] prices for ${code}, attempt ${attempt}:`, e);
+        if (attempt < 3) await wait(2000 * attempt);
+      }
+    }
+    failed.push(code);
+  };
+  for (let i = 0; i < sets.length; i++) {
+    await loadSet(sets[i], i);
+    if (workingRelay && workingRelay.name !== 'direct') await wait(800);  // be gentle with relays
+  }
+  return { idx, failed, route: workingRelay ? workingRelay.name : null };
+}
+
+// ── Manual price files: SWU-DB set lists saved from the browser ──────────────
+// Opening https://api.swu-db.com/cards/sor directly in a tab always works, even
+// when the tracker itself is blocked. Saved with Ctrl/Cmd+S, those files can be
+// dropped into the upload box.
+function parseSwuDbFile(text) {
+  let t = text.trim();
+  if (!t.startsWith('{')) {                  // saved as a web page: dig the JSON out
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a < 0 || b <= a) return null;
+    const ta = document.createElement('textarea');
+    ta.innerHTML = t.slice(a, b + 1);        // undo &quot; etc.
+    t = ta.value;
+  }
+  try {
+    const data = JSON.parse(t);
+    const cards = Array.isArray(data) ? data : data.data;
+    if (!Array.isArray(cards) || !cards.length || !('VariantType' in cards[0] || 'MarketPrice' in cards[0])) return null;
+    return cards;
+  } catch (e) { return null; }
+}
+function addSwuDbFiles(cardLists) {
+  if (!trackerRows.length) { setStatus('Load your collection first, then drop the price files.'); return; }
+  const idx = {};
+  const sets = new Set();
+  for (const cards of cardLists) {
+    const bySet = {};
+    for (const c of cards) (bySet[(c.Set || '').toUpperCase()] = bySet[(c.Set || '').toUpperCase()] || []).push(c);
+    for (const [code, list] of Object.entries(bySet)) {
+      if (!MAIN_SETS.includes(code)) continue;
+      if (indexSwuDbCards(code, list, idx)) sets.add(code);
+    }
+  }
+  if (!sets.size) { setStatus('Those files didn\'t contain prices for any tracked set.'); return; }
+  priceIndex = { ...(priceIndex || {}), ...idx };
+  priceMeta = { source: 'files', updatedAt: new Date().toISOString(), failed: MAIN_SETS.filter(c => !sets.has(c) && !Object.keys(priceIndex).some(k => k.startsWith(c + '||'))) };
+  savePrices(); refreshAfterPrices(); describePrices();
+  setStatus(`✓ Added prices for ${[...sets].join(', ')}.`);
+}
+function manualPriceLinks() {
+  return SETS.map(x => `<a href="https://api.swu-db.com/cards/${x.code.toLowerCase()}" target="_blank" rel="noopener" style="color:var(--accent)">${x.code}</a>`).join(' · ');
+}
+
+// Fallback: tcgcsv "ProductsAndPrices" CSV files dropped onto the upload box
+function recordsFromPriceCSV(text) {
+  const rows = parseCSVFull(text);
+  if (!rows.length) return [];
+  const keys = Object.keys(rows[0]);
+  const numKey = keys.find(k => /^ext.*number$/i.test(k)) || keys.find(k => /^number$/i.test(k));
+  return rows.map(r => ({ groupId: r.groupId, abbr: '', name: r.name, number: numKey ? r[numKey] : '',
+    url: r.url, subType: r.subTypeName, market: r.marketPrice, mid: r.midPrice, low: r.lowPrice }));
+}
+const isPriceCSV = text => /^\uFEFF?"?productId"?\s*,/i.test(text.slice(0, 200));
+
+function savePrices() {
+  try { localStorage.setItem(PRICE_KEY, JSON.stringify({ meta: priceMeta, index: priceIndex })); } catch (e) {}
+}
+function loadCachedPrices() {
+  try { const c = JSON.parse(localStorage.getItem(PRICE_KEY) || 'null'); return c && c.index ? c : null; }
+  catch (e) { return null; }
+}
+
+function showPriceRow(msg, canRefresh = true) {
+  document.getElementById('price-text').innerHTML = msg;
+  document.getElementById('price-refresh-btn').hidden = !canRefresh;
+  document.getElementById('price-row').hidden = false;
+}
+function describePrices() {
+  const n = Object.keys(priceIndex || {}).length;
+  const when = new Date(priceMeta.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  if (priceMeta.source === 'localfile') {
+    const ageH = (Date.now() - new Date(priceMeta.updatedAt)) / 36e5;
+    const gap = setsMissingPrices(priceIndex).map(x => x.code);
+    showPriceRow(`TCGplayer market prices for ${n.toLocaleString()} cards, updated ${when}.` +
+      (ageH > PRICE_FILE_STALE_H ? ` <b>Prices haven't updated in ${Math.floor(ageH / 24)} day(s)</b>; check the daily price update (the Actions tab on GitHub).` : '') +
+      (() => {
+        const inList = gap.filter(c => (priceMeta.fileSets || []).includes(c));
+        const notInList = gap.filter(c => !inList.includes(c));
+        return (inList.length ? ` ${inList.join(', ')} didn't download last time; the next daily update will try again.` : '') +
+               (notInList.length ? ` No prices for ${notInList.join(', ')} yet; they'll appear after the next daily update.` : '');
+      })());
+    return;
+  }
+  const src = priceMeta.source === 'csv' ? 'TCGplayer prices from tcgcsv files you added'
+            : priceMeta.source === 'files' ? 'TCGplayer market prices from swu-db files you added'
+            : 'TCGplayer market prices via swu-db.com';
+  const gap = setsMissingPrices(priceIndex).map(x => x.code);
+  const miss = (gap.length ? ` Still missing ${gap.join(', ')}; click Refresh prices to retry.` : '') +
+               (priceMeta.route && priceMeta.route !== 'direct' ? ` (Loaded through ${priceMeta.route}.)` : '');
+  showPriceRow(`${src.charAt(0).toUpperCase() + src.slice(1)} for ${n.toLocaleString()} cards, as of ${when}.${miss}`);
+}
+
+// Attach price + copies-needed info to every main-set row
+function applyPrices() {
+  for (const r of trackerRows) {
+    r.need = r.status === 'Complete' ? 0 : r.goal - Math.min(r.owned, r.goal);
+    const e = priceIndex && priceIndex[`${r.set}||${parseInt(r.numNorm, 10)}`];
+    r.price = e ? e.p : null;
+    r.tcgUrl = e ? e.u : '';
+    r.tcgName = e ? e.n : '';
+    r.tcgAbbr = e ? e.a : '';
+    r.tcgNum = e ? e.t : '';
+    r.priceSort = r.price ?? 1e9;  // unpriced cards sort last
+  }
+  // Prestige / Hyperspace: goal is 1, matched by name to the right TCGplayer printing
+  for (const [rows, kind] of [[prestigeTrackerRows, 'prestige'], [hsTrackerRows, 'hs']]) {
+    for (const r of rows) {
+      r.need = r.owned >= 1 ? 0 : 1;
+      r.variantKind = kind;
+      const e = priceIndex && priceIndex[`V||${r.set}||${normName(r.name)}||${kind}`];
+      r.price = e ? e.p : null;
+      r.tcgUrl = e ? e.u : '';
+      r.tcgName = e ? e.n : '';
+      r.tcgAbbr = e ? e.a : '';
+      r.tcgNum = e ? e.t : '';
+      r.priceSort = r.price ?? 1e9;
+    }
+  }
+}
+function refreshAfterPrices() {
+  applyPrices(); renderSummary(); applyFilters(); syncMaxPriceInput();
+}
+function syncMaxPriceInput() {
+  const el = document.getElementById('max-price');
+  const ready = !!(priceIndex && Object.keys(priceIndex).length);
+  el.disabled = !ready;
+  el.title = ready ? 'Only show cards at or under this price' : 'Available once TCGplayer prices have loaded';
+  if (!ready && maxPrice !== null) { maxPrice = null; el.value = ''; }
+}
+
+function costOf(rows) {
+  let cost = 0, unpriced = 0, need = 0;
+  for (const r of rows) {
+    if (!r.need) continue;
+    need += r.need;
+    if (r.price == null) unpriced++; else cost += r.price * r.need;
+  }
+  return { cost, unpriced, need };
+}
+
+function priceCell(r) {
+  if (r.opSet) return '';
+  if (r.price == null) return priceIndex ? '<span style="color:var(--text-dim)">—</span>' : '';
+  const label = money(r.price);
+  const link = r.tcgUrl ? `<a href="${r.tcgUrl}" target="_blank" rel="noopener" title="Open on TCGplayer">${label}</a>` : label;
+  const need = r.need ? `<span class="price-need">×${r.need} = ${money(r.price * r.need)}</span>` : '';
+  return link + need;
+}
+
+// ── Local price file (swu_prices.js), written daily by the updater script ────
+const PRICE_FILE_STALE_H = 36;
+function priceIndexFromLocalFile(data) {
+  const idx = {};
+  for (const [code, payload] of Object.entries(data.sets || {})) {
+    const cards = payload && (Array.isArray(payload) ? payload : payload.data);
+    if (MAIN_SETS.includes(code) && Array.isArray(cards)) indexSwuDbCards(code, cards, idx);
+  }
+  return idx;
+}
+// Re-read the file from disk without reloading the page
+function reloadLocalPriceFile() {
+  return new Promise(resolve => {
+    const el = document.createElement('script');
+    el.src = `swu_prices.js?t=${Date.now()}`;
+    el.charset = 'utf-8';
+    el.onload = () => { el.remove(); resolve(window.SWU_PRICE_DATA || null); };
+    el.onerror = () => { el.remove(); resolve(null); };
+    document.head.appendChild(el);
+  });
+}
+function useLocalPriceFile(data) {
+  const idx = priceIndexFromLocalFile(data);
+  if (!Object.keys(idx).length) return false;
+  priceIndex = idx;
+  priceMeta = { source: 'localfile', updatedAt: data.fetchedAt || new Date().toISOString(), fileSets: Object.keys(data.sets || {}) };
+  refreshAfterPrices(); describePrices();
+  return true;
+}
+
+// Which tracked sets have no prices in an index
+function setsMissingPrices(index) {
+  const have = new Set(Object.keys(index || {}).map(k => k.startsWith('V||') ? k.split('||')[1] : k.split('||')[0]));
+  return SETS.filter(x => !have.has(x.code));
+}
+
+async function loadPrices({ force = false } = {}) {
+  if (!trackerRows.length) return;
+  // Preferred: the daily price file next to this page
+  if (window.SWU_PRICE_DATA || force) {
+    const data = force ? (await reloadLocalPriceFile()) || window.SWU_PRICE_DATA : window.SWU_PRICE_DATA;
+    if (data && useLocalPriceFile(data)) return;
+  }
+  const cached = loadCachedPrices();
+  const fresh = cached && (Date.now() - new Date(cached.meta.updatedAt)) / 36e5 < PRICE_MAX_AGE_H;
+  const manual = cached && (cached.meta.source === 'csv' || cached.meta.source === 'files');
+  const missing = cached ? setsMissingPrices(cached.index) : SETS;
+
+  // Show whatever we already have right away
+  if (cached) { priceIndex = cached.index; priceMeta = cached.meta; refreshAfterPrices(); describePrices(); }
+  // Fully up to date (or manual files the user chose): nothing to fetch
+  if (cached && !force && (manual || (fresh && !missing.length))) return;
+
+  // Fresh but incomplete: fetch only the missing sets. Stale or forced: fetch everything.
+  const toLoad = cached && fresh && !force ? missing : SETS;
+  try {
+    const { idx, failed, route } = await fetchPricesFromSwuDb(toLoad);
+    if (!Object.keys(idx).length) {
+      throw new Error(failed.length === toLoad.length ? 'neither swu-db.com nor the backup routes responded' : 'no prices found');
+    }
+    const merged = toLoad.length === SETS.length ? idx : { ...(priceIndex || {}), ...idx };
+    priceIndex = merged;
+    priceMeta = { source: 'swudb', updatedAt: toLoad.length === SETS.length ? new Date().toISOString() : (priceMeta?.updatedAt || new Date().toISOString()),
+                  failed: setsMissingPrices(merged).map(x => x.code), route };
+    savePrices(); refreshAfterPrices(); describePrices();
+  } catch (e) {
+    console.warn('Price fetch failed:', e);
+    if (!cached) syncMaxPriceInput();
+    const why = e instanceof TypeError ? 'your browser blocked the request' : e.message;
+    const gap = setsMissingPrices(priceIndex).map(x => x.code);
+    showPriceRow(
+      `Couldn't load ${cached ? `prices for ${gap.join(', ')}` : 'prices'} automatically (${why}).` + (cached ? ' Showing the prices saved for the other sets.' : '') +
+      `<br>Click <b>Refresh prices</b> to try again, or add them by hand: open each set — ${manualPriceLinks()} — press <b>Ctrl+S</b> (Mac: <b>⌘S</b>) on each tab to save it, ` +
+      `then drop the saved files into the upload box.`);
+  }
+}
+
+function addPriceFiles(texts) {
+  if (!trackerRows.length) { setStatus('Load your collection first, then drop the price files.'); return; }
+  const records = texts.flatMap(recordsFromPriceCSV);
+  const idx = buildPriceIndex(records);
+  const n = Object.keys(idx).length;
+  if (!n) { setStatus('None of the cards in those price files matched your sets. Make sure they are Star Wars: Unlimited ProductsAndPrices CSVs from tcgcsv.com.'); return; }
+  priceIndex = { ...(priceIndex || {}), ...idx };
+  priceMeta = { source: 'csv', updatedAt: new Date().toISOString() };
+  savePrices(); refreshAfterPrices(); describePrices();
+  setStatus(`✓ Added prices for ${n.toLocaleString()} cards.`);
+}
+
+// ── Buy what's showing (TCGplayer Mass Entry) ────────────────────────────────
+// Mass Entry reads one card per line: "<qty> <name> [<set code>] <number>".
+// If TCGplayer doesn't match lines well, this is the one function to tweak.
+function massEntryLine(r) {
+  if (r.tcgName) {
+    const setPart = r.tcgAbbr ? ` [${r.tcgAbbr}]${r.tcgNum ? ` ${r.tcgNum}` : ''}` : '';
+    return `${r.need} ${r.tcgName}${setPart}`;
+  }
+  // No TCGplayer match: best-guess name, tagged so Mass Entry doesn't grab the normal card
+  const tag = r.variantKind === 'prestige' ? ' (Prestige)' : r.variantKind === 'hs' ? ' (Hyperspace)' : '';
+  return `${r.need} ${r.name.replace(/, /, ' - ')}${tag}`;
+}
+
+function openBuyModal() {
+  const rows = filteredRows.filter(r => r.need > 0);
+  if (!rows.length) return;
+  const lines = rows.map(massEntryLine);
+  const copies = rows.reduce((n, r) => n + r.need, 0);
+  const c = costOf(rows);
+  const costText = !priceIndex ? ''
+    : c.cost === 0 ? ' No TCGplayer prices found for these cards.'
+    : ` Estimated ${money(c.cost)} at market price${c.unpriced ? ` (${c.unpriced} card${c.unpriced === 1 ? '' : 's'} without a price)` : ''}.`
+  ;
+  document.getElementById('buy-summary').textContent =
+    `${rows.length.toLocaleString()} card${rows.length === 1 ? '' : 's'}, ${copies.toLocaleString()} cop${copies === 1 ? 'y' : 'ies'} needed.${costText}` +
+    (rows.some(r => r.variantKind) ? ' Prestige and Hyperspace lines use a best-guess TCGplayer name, so check them before checkout.' : '');
+  document.getElementById('buy-list').value = lines.join('\n');
+  document.getElementById('buy-modal').hidden = false;
+  document.getElementById('buy-open').focus();
+}
+function closeBuyModal() { document.getElementById('buy-modal').hidden = true; document.getElementById('buy-btn').focus(); }
+
+async function copyBuyList(btn) {
+  const text = document.getElementById('buy-list').value;
+  try {
+    await navigator.clipboard.writeText(text);
+    const old = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => btn.textContent = old, 1500);
+    return true;
+  } catch (e) {
+    const ta = document.getElementById('buy-list'); ta.focus(); ta.select();
+    alert('Your browser blocked copying. The list is selected — press Ctrl/Cmd+C to copy it.');
+    return false;
+  }
+}
+async function openMassEntry(btn) {
+  await copyBuyList(btn);
+  const lines = document.getElementById('buy-list').value.split('\n').map(l => l.trim()).filter(Boolean);
+  // Pre-filling Mass Entry from the link isn't documented by TCGplayer; the list is copied either way.
+  let url = `${MASS_ENTRY_URL}?productline=${encodeURIComponent('Star Wars Unlimited')}&c=${encodeURIComponent(lines.join('||'))}`;
+  if (url.length > 7000) url = `${MASS_ENTRY_URL}?productline=${encodeURIComponent('Star Wars Unlimited')}`;
+  window.open(url, '_blank', 'noopener');
+}
+
+// ── Main flow ─────────────────────────────────────────────────────────────────
+// Remembers the last uploaded CSV in this browser so you only re-upload
+// when your collection has changed.
+const SAVED_KEY = 'swuTracker.savedCollection.v1';
+
+function saveCollection(text, fileName) {
+  try {
+    localStorage.setItem(SAVED_KEY, JSON.stringify({ text, fileName, savedAt: new Date().toISOString() }));
+  } catch (e) { console.warn('Could not save collection locally:', e); }
+}
+function loadSavedCollection() {
+  try {
+    const raw = localStorage.getItem(SAVED_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+function forgetSavedCollection() {
+  try { localStorage.removeItem(SAVED_KEY); } catch (e) {}
+  document.getElementById('saved-row').hidden = true;
+}
+function showSavedRow(saved) {
+  const row = document.getElementById('saved-row');
+  if (!saved) { row.hidden = true; return; }
+  const when = new Date(saved.savedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  document.getElementById('saved-text').textContent =
+    `Showing ${saved.fileName || 'your saved collection'}, uploaded ${when}. Drop a new export above to update it.`;
+  row.hidden = false;
+}
+
+// Accepts one SWUDB collection export and/or tcgcsv price files, in any order
+async function handleFiles(fileList) {
+  const files = [...(fileList || [])];
+  if (!files.length) return;
+  setStatus('Reading files…', true);
+  const texts = await Promise.all(files.map(async f => ({ name: f.name, text: await f.text() })));
+  const swuDbLists = [];
+  const priceFiles = [];
+  let collection = null;
+  const unknown = [];
+  for (const t of texts) {
+    const cards = parseSwuDbFile(t.text);
+    if (cards) swuDbLists.push(cards);
+    else if (isPriceCSV(t.text)) priceFiles.push(t);
+    else if (/(^|,)"?Set"?(,|$)/m.test(t.text.split('\n')[0]) && /CardNumber/.test(t.text.split('\n')[0])) collection = collection || t;
+    else unknown.push(t.name);
+  }
+  if (unknown.length && !collection && !swuDbLists.length && !priceFiles.length) {
+    setStatus(`Couldn't read ${unknown.join(', ')}. Drop your SWUDB collection CSV, or the price files saved from swu-db.com.`); return;
+  }
+  if (collection) {
+    const ok = await processCSVText(collection.text);
+    if (ok) { saveCollection(collection.text, collection.name); showSavedRow(loadSavedCollection()); }
+  }
+  if (priceFiles.length) addPriceFiles(priceFiles.map(t => t.text));
+  if (swuDbLists.length) addSwuDbFiles(swuDbLists);
+}
+const processFile = file => handleFiles(file ? [file] : []);
+
+async function processCSVText(text) {
+  try {
+    const csvRows = parseCSV(text);
+    if (!csvRows.length || !('Set' in csvRows[0]) || !('CardNumber' in csvRows[0])) {
+      setStatus('This CSV is missing the Set and CardNumber columns. Use the "human readable" collection export from swudb.com.');
+      return false;
+    }
+    setStatus(`Parsed ${csvRows.length.toLocaleString()} rows from your export.`, true);
+
+    const agg = aggregateCollection(csvRows);
+
+    setStatus('Fetching card lists…', true);
+    let cards, opMaster, mainResult;
+    try {
+      let swuDbMaster;
+      [mainResult, swuDbMaster] = await Promise.all([
+        fetchMasterCards(),
+        fetchOPMasterFromSwuDb(),
+      ]);
+      cards = mainResult.cards;
+      const exportMaster = buildOPMasterFromExport(mainResult.allCards);
+      opMaster = { ...exportMaster, ...swuDbMaster };
+    } catch(e) {
+      setStatus('⚠ Could not reach swuapi.com. Check your internet connection and try again. Error: ' + e.message);
+      return false;
+    }
+    setStatus(`Got ${cards.length.toLocaleString()} base cards. Merging data…`, true);
+
+    masterCards         = cards;
+    trackerRows         = mergeData(cards, agg);
+    opTrackerRows       = buildOPTrackerRows(agg, opMaster);
+    prestigeTrackerRows = buildPrestigeTrackerRows(mainResult.prestigeCards, agg);
+    hsTrackerRows       = buildHSTrackerRows(mainResult.hsCards, agg);
+    filteredRows        = [...trackerRows];
+    applyPrices();
+
+    renderSummary();
+    applyFilters();
+
+    document.getElementById('controls').classList.add('active');
+    document.getElementById('table-wrap').classList.add('active');
+    document.getElementById('dl-btn').disabled = false;
+
+    showNotice(findUnknownCollectionSets(csvRows, new Set(trackerRows.map(r => r.name.toLowerCase()))), findNewSetsInDatabase(mainResult.allCards));
+
+    const missing = trackerRows.filter(r=>r.status==='Missing').length;
+    setStatus(`✓ Ready — ${trackerRows.length.toLocaleString()} cards loaded · ${missing.toLocaleString()} missing from collection`);
+    loadPrices();  // runs in the background; table updates when prices arrive
+    return true;
+  } catch(e) {
+    setStatus('Error: ' + e.message);
+    console.error(e);
+    return false;
+  }
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+
+dropzone.addEventListener('click',  () => fileInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave',  () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('drag-over');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => { handleFiles(fileInput.files); fileInput.value = ''; });
+
+document.getElementById('dl-btn').addEventListener('click', openInSheets);
+
+document.getElementById('buy-btn').addEventListener('click', openBuyModal);
+document.getElementById('buy-close').addEventListener('click', closeBuyModal);
+document.getElementById('buy-copy').addEventListener('click', e => copyBuyList(e.currentTarget));
+document.getElementById('buy-open').addEventListener('click', e => openMassEntry(e.currentTarget));
+document.getElementById('buy-modal').addEventListener('click', e => { if (e.target.id === 'buy-modal') closeBuyModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('buy-modal').hidden) closeBuyModal(); });
+document.getElementById('price-refresh-btn').addEventListener('click', () => loadPrices({ force: true }));
+document.getElementById('max-price').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  maxPrice = isNaN(v) ? null : v;
+  applyFilters();
+});
+
+document.getElementById('forget-btn').addEventListener('click', () => {
+  forgetSavedCollection();
+  setStatus('Saved collection removed from this browser. Drop a SWUDB export to start again.');
+});
+
+// On open, reload the last collection automatically (card data is still fetched live)
+(async function restoreSavedCollection() {
+  const saved = loadSavedCollection();
+  if (!saved || !saved.text) return;
+  showSavedRow(saved);
+  setStatus('Loading your saved collection…', true);
+  await processCSVText(saved.text);
+})();
+
+document.getElementById('search').addEventListener('input', e => {
+  searchText = e.target.value; applyFilters();
+});
+
+document.getElementById('reprint-toggle').addEventListener('change', function() {
+  showReprints = this.checked; applyFilters();
+});
+
+function toggleOPOnly() {
+  showOPOnly = !showOPOnly;
+  if (showOPOnly) { showPrestigeOnly = false; showHSOnly = false; }
+  document.getElementById('op-toggle-pill').classList.toggle('active', showOPOnly);
+  document.getElementById('prestige-toggle-pill').classList.toggle('active', false);
+  document.getElementById('hs-toggle-pill').classList.toggle('active', false);
+  applyFilters();
+}
+
+function togglePrestigeOnly() {
+  showPrestigeOnly = !showPrestigeOnly;
+  if (showPrestigeOnly) { showOPOnly = false; showHSOnly = false; }
+  document.getElementById('prestige-toggle-pill').classList.toggle('active', showPrestigeOnly);
+  document.getElementById('op-toggle-pill').classList.toggle('active', false);
+  document.getElementById('hs-toggle-pill').classList.toggle('active', false);
+  applyFilters();
+}
+
+function toggleHSOnly() {
+  showHSOnly = !showHSOnly;
+  if (showHSOnly) { showOPOnly = false; showPrestigeOnly = false; }
+  document.getElementById('hs-toggle-pill').classList.toggle('active', showHSOnly);
+  document.getElementById('op-toggle-pill').classList.toggle('active', false);
+  document.getElementById('prestige-toggle-pill').classList.toggle('active', false);
+  applyFilters();
+}
+
+function toggleSetPill(set) {
+  if (set === 'all') {
+    filterSets.clear();
+    document.querySelectorAll('.set-pill').forEach(p => p.classList.remove('active'));
+    document.getElementById('sp-all').classList.add('active');
+  } else {
+    document.getElementById('sp-all').classList.remove('active');
+    if (filterSets.has(set)) {
+      filterSets.delete(set);
+      document.getElementById(`sp-${set}`).classList.remove('active');
+    } else {
+      filterSets.add(set);
+      document.getElementById(`sp-${set}`).classList.add('active');
+    }
+    if (filterSets.size === 0) {
+      document.getElementById('sp-all').classList.add('active');
+    }
+  }
+  applyFilters();
+}
+
+['all','missing','partial','complete','not-playset'].forEach(id => {
+  document.getElementById(`f-${id}`).addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    filterStatus = id;
+    applyFilters();
+  });
+});
+
+document.querySelectorAll('thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) sortDir *= -1;
+    else { sortCol = col; sortDir = 1; }
+    document.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted'));
+    th.classList.add('sorted');
+    applyFilters();
+  });
+});
+
+function positionTooltip(e, wrap) {
+  const tip = wrap.querySelector('.card-tooltip');
+  if (!tip) return;
+  const TW = 216, TH = 310; // approx tooltip size (200px img + padding)
+  let x = e.clientX + 16;
+  let y = e.clientY + 8;
+  if (x + TW > window.innerWidth)  x = e.clientX - TW - 8;
+  if (y + TH > window.innerHeight) y = e.clientY - TH - 8;
+  tip.style.left = x + 'px';
+  tip.style.top  = y + 'px';
+}
+document.addEventListener('mousemove', e => {
+  const tip = document.querySelector('.card-tooltip-wrap:hover .card-tooltip');
+  if (!tip) return;
+  const TW = 216, TH = 310;
+  let x = e.clientX + 16;
+  let y = e.clientY + 8;
+  if (x + TW > window.innerWidth)  x = e.clientX - TW - 8;
+  if (y + TH > window.innerHeight) y = e.clientY - TH - 8;
+  tip.style.left = x + 'px';
+  tip.style.top  = y + 'px';
+});
+</script>
+</body>
+</html>
