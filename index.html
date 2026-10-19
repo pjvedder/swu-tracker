@@ -188,6 +188,21 @@
     color: var(--text);
   }
   .set-pill-all.active { opacity: 1; border-color: var(--accent); color: var(--accent); }
+  #rarity-pills {
+    display: flex; flex-wrap: wrap; gap: .4rem; align-items: center;
+    padding: .5rem .75rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .rarity-pill {
+    font-family: var(--font-mono); font-size: .7rem; font-weight: 700;
+    min-width: 1.9rem; text-align: center;
+    padding: .2rem .55rem; border-radius: 3px; cursor: pointer; letter-spacing: .04em;
+    background: var(--surface); border: 1px solid currentColor;
+    opacity: .45; transition: opacity .15s, transform .1s; user-select: none;
+  }
+  .rarity-pill.active { opacity: 1; background: color-mix(in srgb, currentColor 18%, transparent); }
+  .rarity-pill:hover { opacity: .8; transform: translateY(-1px); }
   .set-pill.active { opacity: 1; }
   .set-pill:hover, .set-pill-all:hover { opacity: .8; transform: translateY(-1px); }
 
@@ -383,7 +398,7 @@
   .price-col a { color: var(--text); text-decoration: none; border-bottom: 1px dotted var(--text-dim); }
   .price-col a:hover { color: var(--accent); border-color: var(--accent); }
   .price-need { display:block; color: var(--text-dim); font-size: .65rem; }
-  #max-price { width: 6.5rem; }
+  #max-price { width: 7.75rem; }
   #max-price:disabled { opacity: .45; cursor: not-allowed; }
   .buy-btn {
     background: transparent; border: 1px solid var(--accent2); color: var(--accent2);
@@ -512,6 +527,14 @@
       <span id="op-toggle-pill" class="set-pill-op" onclick="toggleOPOnly()">OP Only</span>
       <span id="prestige-toggle-pill" class="set-pill-prestige" onclick="togglePrestigeOnly()">Prestige Only</span>
       <span id="hs-toggle-pill" class="set-pill-hs" onclick="toggleHSOnly()">Hyperspace Only</span>
+    </div>
+    <div id="rarity-pills">
+      <span class="set-pill-all active" id="rp-all" onclick="toggleRarityPill('all')">All Rarities</span>
+      <span class="rarity-pill rarity-C" id="rp-Common"    title="Common"    onclick="toggleRarityPill('Common')">C</span>
+      <span class="rarity-pill rarity-U" id="rp-Uncommon"  title="Uncommon"  onclick="toggleRarityPill('Uncommon')">U</span>
+      <span class="rarity-pill rarity-R" id="rp-Rare"      title="Rare"      onclick="toggleRarityPill('Rare')">R</span>
+      <span class="rarity-pill rarity-L" id="rp-Legendary" title="Legendary" onclick="toggleRarityPill('Legendary')">L</span>
+      <span class="rarity-pill rarity-S" id="rp-Special"   title="Special"   onclick="toggleRarityPill('Special')">S</span>
     </div>
     <div id="controls-row2">
       <button class="filter-btn active" id="f-all">All</button>
@@ -663,6 +686,7 @@ let hsTrackerRows = [];       // Hyperspace master list
 let filteredRows = [];
 let sortCol = 'set', sortDir = 1;
 let filterStatus = 'all', filterSets = new Set(), searchText = '';
+let filterRarities = new Set();
 let showReprints = false, showOPOnly = false, showPrestigeOnly = false, showHSOnly = false;
 let currentPage = 1;
 let maxPrice = null;
@@ -1263,6 +1287,7 @@ function applyFilters() {
   if (specialMode === 'normal' && !showReprints) rows = rows.filter(r => !r.isReprint);
   if (specialMode !== 'op' && maxPrice !== null) rows = rows.filter(r => r.price != null && r.price <= maxPrice);
   if (filterSets.size > 0)    rows = rows.filter(r => filterSets.has(r.set));
+  if (filterRarities.size > 0) rows = rows.filter(r => filterRarities.has(r.rarity));
   if (searchText)             rows = rows.filter(r => r.name.toLowerCase().includes(searchText.toLowerCase()));
   if (filterStatus === 'missing')     rows = rows.filter(r => r.status === 'Missing');
   if (filterStatus === 'partial')     rows = rows.filter(r => r.status !== 'Missing' && r.status !== 'Complete');
@@ -1444,6 +1469,11 @@ function renderSummary() {
     {l:'Missing',            v:missing,     s:'unique cards, 0 copies'},
     {l:'Has Hyperspace',     v:hasHS,       s:`${Math.round(hasHS/total*100)}% coverage`},
     ...(priceIndex ? [(() => {
+      const w = collectionWorth(trackerRows);
+      return {l:'Collection Worth', v:money(w.worth, true),
+              s: w.unpricedCopies ? `${w.unpricedCopies.toLocaleString()} cop${w.unpricedCopies===1?'y':'ies'} unpriced` : 'TCGplayer market price'};
+    })()] : []),
+    ...(priceIndex ? [(() => {
       const c = costOf(base);
       return {l:'Cost to Complete', v:money(c.cost, true),
               s: c.unpriced ? `${c.unpriced} needed card${c.unpriced===1?'':'s'} unpriced` : 'TCGplayer market price'};
@@ -1603,7 +1633,7 @@ function buildSheetData() {
 // ── TCGplayer prices (via tcgcsv.com, a free daily mirror of TCGplayer data) ──
 const TCG_CATEGORY_ID = 79;                       // Star Wars: Unlimited on TCGplayer
 const TCGCSV_BASE     = 'https://tcgcsv.com/tcgplayer';
-const PRICE_KEY       = 'swuTracker.prices.v5';
+const PRICE_KEY       = 'swuTracker.prices.v6';
 const PRICE_MAX_AGE_H = 12;                       // tcgcsv refreshes once a day
 const MASS_ENTRY_URL  = 'https://www.tcgplayer.com/massentry';
 
@@ -1847,6 +1877,12 @@ function indexSwuDbCards(code, cards, idx) {
       if (n != null) { idx[`${code}||${n}`] = { p, u: url(c), n: tcgName, a: '', t: String(n) }; added++; }
       continue;
     }
+    // Foil (and Hyperfoil) prices, by name — used to value the foils you own
+    if (vt === 'foil' || vt === 'hyperfoil') {
+      const fk = `F||${code}||${normName(full)}||${vt}`;
+      if (!idx[fk] || p < idx[fk].p) idx[fk] = { p };
+      if (vt === 'foil') continue;
+    }
     // Prestige / Hyperspace: prefer the plain printing, then the cheapest
     const kind = vt.includes('prestige') ? 'prestige' : vt.includes('hyper') ? 'hs' : null;
     if (!kind) continue;
@@ -2016,6 +2052,37 @@ function syncMaxPriceInput() {
   el.disabled = !ready;
   el.title = ready ? 'Only show cards at or under this price' : 'Available once TCGplayer prices have loaded';
   if (!ready && maxPrice !== null) { maxPrice = null; el.value = ''; }
+}
+
+// Market value of every copy you own, each version at its own price where
+// known (Foil, Hyperspace, Prestige), otherwise at the Normal price.
+function collectionWorth(rows) {
+  let worth = 0, unpricedCopies = 0;
+  const vp = (kind, r) => {
+    const e = priceIndex && priceIndex[`V||${r.set}||${normName(r.name)}||${kind}`];
+    return e ? e.p : null;
+  };
+  const fp = (r, vt) => {
+    const e = priceIndex && priceIndex[`F||${r.set}||${normName(r.name)}||${vt}`];
+    return e ? e.p : null;
+  };
+  for (const r of rows) {
+    if (!r.owned) continue;
+    const base = r.price;
+    const parts = [
+      [r.normCt || 0,      base],
+      [r.foilCt || 0,      fp(r, 'foil') ?? base],
+      [r.hsCopies || 0,    vp('hs', r) ?? base],
+      [r.presCopies || 0,  vp('prestige', r) ?? base],
+    ];
+    const listed = parts.reduce((n, [c]) => n + c, 0);
+    parts.push([Math.max(0, r.owned - listed), base]);   // OP, promo, Showcase copies
+    for (const [copies, price] of parts) {
+      if (!copies) continue;
+      if (price == null) unpricedCopies += copies; else worth += copies * price;
+    }
+  }
+  return { worth, unpricedCopies };
 }
 
 function costOf(rows) {
@@ -2367,6 +2434,16 @@ function toggleHSOnly() {
   document.getElementById('hs-toggle-pill').classList.toggle('active', showHSOnly);
   document.getElementById('op-toggle-pill').classList.toggle('active', false);
   document.getElementById('prestige-toggle-pill').classList.toggle('active', false);
+  applyFilters();
+}
+
+// Rarity pills work like set pills: pick any combination; none = all rarities
+function toggleRarityPill(rarity) {
+  if (rarity === 'all') filterRarities.clear();
+  else if (filterRarities.has(rarity)) filterRarities.delete(rarity);
+  else filterRarities.add(rarity);
+  document.querySelectorAll('.rarity-pill').forEach(p => p.classList.toggle('active', filterRarities.has(p.id.slice(3))));
+  document.getElementById('rp-all').classList.toggle('active', filterRarities.size === 0);
   applyFilters();
 }
 
