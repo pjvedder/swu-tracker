@@ -267,6 +267,7 @@
     display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
     padding: .5rem .75rem;
   }
+  .action-group { display: flex; gap: .5rem; align-items: center; flex-wrap: nowrap; margin-left: auto; }
   #reprint-toggle-wrap {
     display: flex; align-items: center; gap: .4rem;
     font-family: var(--font-mono);
@@ -347,11 +348,14 @@
   .badge-missing  { background: rgba(231,76,60,.12);  color: #e74c3c; border: 1px solid rgba(231,76,60,.3); }
 
   .check { color: var(--green); font-size: .9rem; }
-  .rarity-C { color: #aaa; }
-  .rarity-U { color: #7eb8f7; }
-  .rarity-R { color: #c9a227; }
-  .rarity-L { color: #e67e22; }
-  .rarity-S { color: #9b59b6; }
+  .rarity-C { color: #c08a52; }   /* bronze */
+  .rarity-U { color: #c3c9d1; }   /* silver */
+  .rarity-R { color: #e8c547; }   /* gold */
+  .rarity-L { color: #4a9eff; }   /* blue */
+  .rarity-S { color: #0b0d12; font-weight: 700;  /* black with a white outline */
+              text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; }
+  .rarity-pill.rarity-S { color: #fff; text-shadow: none; background: #000; border-color: #fff; }
+  .rarity-pill.rarity-S.active { background: #000; box-shadow: 0 0 0 1px #000, 0 0 0 2px #fff; }
 
   /* Card image tooltip */
   .card-tooltip-wrap {
@@ -406,6 +410,7 @@
     padding: .45rem .9rem; border-radius: 4px; cursor: pointer;
   }
   .buy-btn:hover { background: rgba(255,215,0,.08); }
+  .buy-total { margin-left: .5rem; padding-left: .5rem; border-left: 1px solid currentColor; font-family: var(--font-mono); font-weight: 700; }
   .buy-btn:disabled { opacity: .4; cursor: not-allowed; }
   .cost-cell { font-family: var(--font-mono); font-size: .8rem; white-space: nowrap; }
   .cost-cell small { display:block; color: var(--text-dim); font-size: .65rem; }
@@ -548,8 +553,10 @@
         <input type="checkbox" id="reprint-toggle"> Show Reprints
       </label>
       <div class="spacer"></div>
-      <button class="buy-btn" id="buy-btn" type="button" disabled title="Build a TCGplayer Mass Entry list from the cards currently showing">Buy what's showing</button>
-      <button class="dl-btn" id="dl-btn" disabled>Open in Google Sheets ↗</button>
+ <div class="action-group">
+      <button class="buy-btn" id="buy-btn" type="button" disabled title="Build a TCGplayer Mass Entry list from the cards currently showing">Buy what's showing<span id="buy-total" class="buy-total" hidden></span></button>
+      <button class="dl-btn" id="dl-btn" disabled title="Copy your collection data to paste into Claude for a Google Sheet">Google Sheets ↗</button>
+      </div>
     </div>
   </div>
 
@@ -1346,6 +1353,18 @@ function applyFilters() {
     : !rows.some(r => r.need > 0)
       ? 'Nothing to buy: every card showing is already complete'
       : 'Build a TCGplayer Mass Entry list from the cards currently showing';
+  // Estimated TCGplayer cost of what's showing, right on the button
+  const totalEl = document.getElementById('buy-total');
+  const buyable = specialMode === 'op' ? [] : rows.filter(r => r.need > 0);
+  if (priceIndex && buyable.length) {
+    const c = costOf(buyable);
+    totalEl.textContent = c.cost > 0 ? `~${money(c.cost)}${c.unpriced ? '+' : ''}` : 'no prices';
+    totalEl.hidden = false;
+    buyBtn.title = `Estimated ${money(c.cost)} at TCGplayer market price for ${c.need.toLocaleString()} cop${c.need === 1 ? 'y' : 'ies'}` +
+      (c.unpriced ? `, plus ${c.unpriced} card${c.unpriced === 1 ? '' : 's'} without a price` : '') + '. Click to build the Mass Entry list.';
+  } else {
+    totalEl.hidden = true;
+  }
   renderTable();
   renderPagination();
   updateRowCount();
