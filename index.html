@@ -423,6 +423,14 @@
   .modal .dim { color: var(--text-dim); }
   .modal textarea { width: 100%; min-height: 260px; flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: .6rem; font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; resize: vertical; }
   .modal-actions { display: flex; gap: .5rem; justify-content: flex-end; flex-wrap: wrap; }
+  .sheet-options { border: 1px solid var(--border); border-radius: 4px; padding: .5rem .75rem; display: flex; flex-direction: column; gap: .35rem; font-size: .8rem; }
+  .sheet-options legend { padding: 0 .3rem; color: var(--text-dim); font-size: .75rem; }
+  .sheet-options label, .sheet-new { display: flex; gap: .45rem; align-items: center; cursor: pointer; font-size: .8rem; }
+  .sheet-options input, .sheet-new input { accent-color: var(--accent); }
+  .sheet-open-link { font-size: .8rem; padding: .45rem .9rem; border-radius: 4px; border: 1px solid var(--green); color: var(--green); text-decoration: none; }
+  .sheet-open-link:hover { background: rgba(46,204,113,.1); }
+  #sheet-status { min-height: 1.2em; }
+  .sheet-new[hidden], .sheet-open-link[hidden] { display: none; }
   .modal-actions .primary { background: var(--accent); border: 1px solid var(--accent); color: #fff; }
   .modal button { font: inherit; font-size: .8rem; padding: .45rem .9rem; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text); border: 1px solid var(--border); }
   .modal button:hover { border-color: var(--accent); }
@@ -565,7 +573,7 @@
       <div class="spacer"></div>
  <div class="action-group">
       <button class="buy-btn" id="buy-btn" type="button" disabled title="Build a TCGplayer Mass Entry list from the cards currently showing">Buy what's showing<span id="buy-total" class="buy-total" hidden></span></button>
-      <button class="dl-btn" id="dl-btn" disabled title="Copy your collection data to paste into Claude for a Google Sheet">Google Sheets ↗</button>
+      <button class="dl-btn" id="dl-btn" disabled title="Create or update your want list in Google Sheets">Want List ↗</button>
       </div>
     </div>
   </div>
@@ -601,6 +609,26 @@
   <div id="pagination"></div>
 </div>
 
+<div class="modal-backdrop" id="sheet-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <h2 id="sheet-title">Want list in Google Sheets</h2>
+    <p>Builds a trade list with four tabs (Base Cards, Prestige, Organized Play, Hyperspace) showing only the cards you still need, with TCGplayer prices. Reprints are left out.</p>
+    <fieldset class="sheet-options">
+      <legend>Which sets?</legend>
+      <label><input type="radio" name="sheet-scope" id="sheet-scope-all" checked> All sets</label>
+      <label><input type="radio" name="sheet-scope" id="sheet-scope-premier"> Premier-legal only <span class="dim">(<span id="sheet-premier-sets"></span>)</span></label>
+    </fieldset>
+    <label id="sheet-target-row" class="sheet-new" hidden><input type="checkbox" id="sheet-new"> Make a new sheet instead of updating my current one</label>
+    <p class="dim" id="sheet-preview"></p>
+    <p id="sheet-status" role="status"></p>
+    <div class="modal-actions">
+      <button type="button" id="sheet-close">Close</button>
+      <a id="sheet-open" class="sheet-open-link" target="_blank" rel="noopener" hidden>Open sheet ↗</a>
+      <button type="button" id="sheet-go" class="primary">Update sheet</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="buy-modal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="buy-title">
     <h2 id="buy-title">Buy on TCGplayer</h2>
@@ -625,19 +653,21 @@
 //           'none'   → no Foil variant in the set (LAW/ASH; Hyperfoil replaces it)
 //   op:     OP/Showdown set codes for this set ('…SH' codes are Store Showdown kits)
 //   opFoil: 'number' → Foil OP shares the OP number; 'name' → Foil OP is base# + 20
+//   premier: true while the set is legal in Premier (update at each rotation;
+//            SOR/SHD/TWI rotated out March 2026, next rotation ~March 2027)
 //   color/text: set accent (tag background/border) and readable text colour
 const SETS = [
   { code:'SOR', name:'Spark of Rebellion',       foil:'number', prestige:false, op:['SOROP','SORSH'], opFoil:'number', color:'#e8180c', text:'#f26c63' },
   { code:'SHD', name:'Shadows of the Galaxy',    foil:'number', prestige:false, op:['SHDOP','SHDSH'], opFoil:'number', color:'#3b4fcc', text:'#8b9ef5' },
   { code:'TWI', name:'Twilight of the Republic', foil:'number', prestige:false, op:['TWIOP','TWISH'], opFoil:'number', color:'#6b1520', text:'#d97080', alpha:[.25,.6] },
-  { code:'JTL', name:'Jump to Lightspeed',       foil:'name',   prestige:true,  op:['JTLP'],          opFoil:'name',   color:'#f2b800', text:'#f2c840', alpha:[.15,.5] },
-  { code:'LOF', name:'Legends of the Force',     foil:'name',   prestige:true,  op:['LOFP'],          opFoil:'name',   color:'#1aace0', text:'#4dcdf0', alpha:[.15,.5] },
-  { code:'SEC', name:'Secrets of Power',         foil:'name',   prestige:true,  op:['SECP'],          opFoil:'name',   color:'#8b2fc9', text:'#c47eef' },
-  { code:'LAW', name:'A Lawless Time',           foil:'none',   prestige:true,  op:['LAWP'],          opFoil:'name',   color:'#f26a00', text:'#f59040', alpha:[.15,.5] },
-  { code:'ASH', name:'Ashes of the Empire',      foil:'none',   prestige:true,  op:['ASHP'],          opFoil:'name',   color:'#5a6e88', text:'#b4c3d8' },
+  { code:'JTL', name:'Jump to Lightspeed',       foil:'name',   prestige:true,  op:['JTLP'],          opFoil:'name',   premier:true, color:'#f2b800', text:'#f2c840', alpha:[.15,.5] },
+  { code:'LOF', name:'Legends of the Force',     foil:'name',   prestige:true,  op:['LOFP'],          opFoil:'name',   premier:true, color:'#1aace0', text:'#4dcdf0', alpha:[.15,.5] },
+  { code:'SEC', name:'Secrets of Power',         foil:'name',   prestige:true,  op:['SECP'],          opFoil:'name',   premier:true, color:'#8b2fc9', text:'#c47eef' },
+  { code:'LAW', name:'A Lawless Time',           foil:'none',   prestige:true,  op:['LAWP'],          opFoil:'name',   premier:true, color:'#f26a00', text:'#f59040', alpha:[.15,.5] },
+  { code:'ASH', name:'Ashes of the Empire',      foil:'none',   prestige:true,  op:['ASHP'],          opFoil:'name',   premier:true, color:'#5a6e88', text:'#b4c3d8' },
   // HMW: code and foil/OP rules are best guesses until the set is in SWUDB exports.
   // Add its OP set code (likely 'HMWP') to op:[] once OP cards appear.
-  { code:'HMW', name:'Homeworlds',               foil:'none',   prestige:true,  op:[],                opFoil:'name',   color:'#128843', text:'#4fd68a' },
+  { code:'HMW', name:'Homeworlds',               foil:'none',   prestige:true,  op:[],                opFoil:'name',   premier:true, color:'#128843', text:'#4fd68a' },
 ];
 
 // Promo / prize sets in SWUDB exports that this tracker deliberately skips
@@ -1593,73 +1623,265 @@ function renderSummary() {
   document.getElementById('set-summary-wrap').style.display = 'block';
 }
 
-// ── Open in Google Sheets (copy data for Claude to create) ───────────────────
-async function openInSheets() {
-  const btn = document.getElementById('dl-btn');
-  btn.disabled = true;
-  btn.textContent = 'Preparing data…';
+// ── Want list → Google Sheets ────────────────────────────────────────────────
+// Builds a trade-ready want list (Base Cards / Prestige / Organized Play /
+// Hyperspace) and writes it to a Google Sheet in your Drive, updating the same
+// sheet each time so a shared link always shows your current needs.
+//
+// One-time setup: create a Google Cloud OAuth client (Web application) whose
+// "Authorized JavaScript origins" include this site's address, and paste its
+// Client ID below. The ID is public by design; it's safe to keep in this file.
+const GOOGLE_CLIENT_ID = '';
+const SHEETS_SCOPE     = 'https://www.googleapis.com/auth/drive.file';  // only files this app creates
+const SHEET_ID_KEY     = 'swuTracker.wantSheetId.v1';
+const SHEET_TITLE      = 'SWU Want List';
+const WANT_TABS        = ['Base Cards', 'Prestige', 'Organized Play', 'Hyperspace'];
 
-  try {
-    const data = buildSheetData();
+const PREMIER_SETS = () => SETS.filter(x => x.premier).map(x => x.code);
+const OP_KIT_NAME  = code => `${OP_PARENT[code] || ''} ${/SH$/.test(code) ? 'Showdown' : 'OP'}`.trim();
 
-    // Encode as compact JSON and copy to clipboard
-    const payload = JSON.stringify(data);
-    await navigator.clipboard.writeText(payload);
+// ---- Building the want list --------------------------------------------------
+function buildWantList({ premierOnly }) {
+  const legal = new Set(premierOnly ? PREMIER_SETS() : MAIN_SETS);
+  const setIdx = Object.fromEntries(MAIN_SETS.map((s, i) => [s, i]));
+  const bySetNum = (a, b) => (setIdx[a.set] - setIdx[b.set]) || (a.numInt - b.numInt);
+  const price = r => (r.price != null ? r.price : '');
 
-    btn.textContent = '✓ Copied! Paste into Claude';
-    setTimeout(() => { btn.textContent = 'Open in Google Sheets ↗'; btn.disabled = false; }, 4000);
-
-    // Show instruction toast
-    const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#111520;border:1px solid #3d7fff;border-radius:8px;padding:1rem 1.5rem;color:#c8d6e5;font-family:Exo 2,sans-serif;font-size:.875rem;z-index:9999;max-width:420px;text-align:center;line-height:1.6;box-shadow:0 4px 24px rgba(0,0,0,.6)';
-    toast.innerHTML = '<strong style="color:#3d7fff">Collection data copied!</strong><br>Go to your Claude chat and paste it — Claude will create the Google Sheet for you.';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 5000);
-
-  } catch(e) {
-    btn.textContent = 'Open in Google Sheets ↗';
-    btn.disabled = false;
-    alert('Could not copy to clipboard: ' + e.message);
+  // Copies owned across every printing of a card name (older printings are
+  // tournament-legal when a card is reprinted into a current set)
+  const ownedByName = {};
+  for (const r of trackerRows) {
+    const k = r.name.toLowerCase();
+    ownedByName[k] = (ownedByName[k] || 0) + (r.owned || 0);
   }
+  const firstSetOf = {};
+  for (const r of trackerRows) {
+    const k = r.name.toLowerCase();
+    if (!(k in firstSetOf) || setIdx[r.set] < setIdx[firstSetOf[k]]) firstSetOf[k] = r.set;
+  }
+
+  const base = [];
+  for (const r of trackerRows) {
+    if (!legal.has(r.set)) continue;
+    let need;
+    if (!r.isReprint) {
+      need = r.status === 'Complete' ? 0 : r.goal - Math.min(r.owned, r.goal);
+    } else if (premierOnly && !legal.has(firstSetOf[r.name.toLowerCase()])) {
+      // Reprint of a rotated-out card: this printing is the legal one, and any copy counts
+      need = Math.max(0, r.goal - (ownedByName[r.name.toLowerCase()] || 0));
+    } else {
+      continue;  // reprints stay hidden; the original printing carries the need
+    }
+    if (need > 0) base.push({ ...r, need });
+  }
+  base.sort(bySetNum);
+
+  const missingVariant = rows => rows.filter(r => legal.has(r.set) && !r.owned).sort(bySetNum);
+  const prestige = missingVariant(prestigeTrackerRows);
+  const hyperspace = missingVariant(hsTrackerRows);
+  const op = opTrackerRows
+    .filter(r => legal.has(r.set) && r.status !== 'Complete' && !r.isUnknown)
+    .sort((a, b) => (setIdx[a.set] - setIdx[b.set]) || (OP_SET_ORDER.indexOf(a.opSet) - OP_SET_ORDER.indexOf(b.opSet)) || (a.numInt - b.numInt));
+
+  return {
+    'Base Cards': {
+      header: ['Set', '#', 'Card Name', 'Rarity', 'Type', 'Qty Needed', 'Price Each', 'Line Total'],
+      money: [6, 7],
+      rows: base.map((r, i) => [r.set, r.number.padStart(3, '0'), r.name, r.rarity, r.type, r.need, price(r),
+                                r.price != null ? `=F${i + 2}*G${i + 2}` : '']),
+    },
+    'Prestige': {
+      header: ['Set', '#', 'Card Name', 'Rarity', 'Qty Needed', 'Price'],
+      money: [5],
+      rows: prestige.map(r => [r.set, String(r.number).padStart(3, '0'), r.name, r.rarity, 1, price(r)]),
+    },
+    'Organized Play': {
+      header: ['Set', 'Kit', '#', 'Card Name', 'Rarity', 'Qty Needed'],
+      money: [],
+      rows: op.map(r => [r.set, OP_KIT_NAME(r.opSet), r.number, r.name, r.rarity, 1]),
+    },
+    'Hyperspace': {
+      header: ['Set', '#', 'Card Name', 'Rarity', 'Qty Needed', 'Price'],
+      money: [5],
+      rows: hyperspace.map(r => [r.set, String(r.number).padStart(3, '0'), r.name, r.rarity, 1, price(r)]),
+    },
+  };
 }
 
-function buildSheetData() {
-  const sheetRows = r => ({
-    set:      r.set,
-    number:   r.number.padStart ? r.number.padStart(3,'0') : r.number,
-    name:     r.name || '',
-    type:     r.type || '',
-    rarity:   r.rarity || '',
-    goal:     r.goal ?? '',
-    owned:    r.owned ?? '',
-    status:   r.status || '',
-    normal:   r.normCt || '',
-    foil:     r.foilCt || '',
-    hs:       r.hasHS   ? 'YES' : '',
-    prestige: r.hasPres ? 'YES' : '',
-    op:       r.opNF > 0 ? 'YES' : '',
-    op_foil:  r.opFoil > 0 ? 'YES' : '',
-    reprint:  r.isReprint ? 'YES' : '',
-    price:    r.price != null ? r.price : '',
-    cost_to_complete: r.price != null && r.need ? +(r.price * r.need).toFixed(2) : '',
+// ---- Google sign-in (Google Identity Services token flow) --------------------
+let gToken = null, gTokenExpires = 0;
+function loadGoogleScript() {
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = 'https://accounts.google.com/gsi/client';
+    el.async = true;
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error('Couldn\'t load Google sign-in. Check your connection or ad blocker.'));
+    document.head.appendChild(el);
   });
-  const opRows = r => ({
-    set: r.set, op_set: r.opSet,
-    number: r.number, name: r.name || '',
-    rarity: r.rarity || '', owned: r.owned ?? '', status: r.status || '',
-    op: r.opNF > 0 ? 'YES' : '', op_foil: r.opFoil > 0 ? 'YES' : '',
+}
+async function getGoogleToken() {
+  if (gToken && Date.now() < gTokenExpires - 60000) return gToken;
+  await loadGoogleScript();
+  return new Promise((resolve, reject) => {
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: SHEETS_SCOPE,
+      callback: resp => {
+        if (resp.error) return reject(new Error(resp.error_description || resp.error));
+        gToken = resp.access_token;
+        gTokenExpires = Date.now() + (resp.expires_in || 3600) * 1000;
+        resolve(gToken);
+      },
+      error_callback: err => reject(new Error(err?.type === 'popup_closed' ? 'Sign-in window was closed.' : (err?.message || 'Google sign-in failed.'))),
+    });
+    client.requestAccessToken({ prompt: '' });
   });
-  const variantRows = r => ({
-    set: r.set, number: r.number, name: r.name || '',
-    type: r.type || '', rarity: r.rarity || '',
-    owned: r.owned ?? '', status: r.status || '',
+}
+
+// ---- Sheets API ---------------------------------------------------------------
+async function sheetsApi(path, { method = 'GET', body } = {}) {
+  const token = await getGoogleToken();
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
   });
-  return {
-    collection: trackerRows.filter(r => !r.isReprint).map(sheetRows),
-    op:         opTrackerRows.map(opRows),
-    prestige:   prestigeTrackerRows.map(variantRows),
-    hyperspace: hsTrackerRows.map(variantRows),
-  };
+  if (!r.ok) {
+    const err = new Error(`Google Sheets error ${r.status}`);
+    err.status = r.status;
+    try { err.message = (await r.json()).error.message || err.message; } catch (e) {}
+    throw err;
+  }
+  return r.json();
+}
+
+const loadSheetId = () => { try { return localStorage.getItem(SHEET_ID_KEY); } catch (e) { return null; } };
+const saveSheetId = id => { try { localStorage.setItem(SHEET_ID_KEY, id); } catch (e) {} };
+const forgetSheetId = () => { try { localStorage.removeItem(SHEET_ID_KEY); } catch (e) {} };
+
+async function createWantSheet() {
+  const s = await sheetsApi('', { method: 'POST', body: {
+    properties: { title: SHEET_TITLE },
+    sheets: WANT_TABS.map(title => ({ properties: { title, gridProperties: { frozenRowCount: 1 } } })),
+  }});
+  saveSheetId(s.spreadsheetId);
+  return s.spreadsheetId;
+}
+
+async function writeWantList(spreadsheetId, list, label) {
+  // Make sure all four tabs exist (they may have been renamed or deleted)
+  const meta = await sheetsApi(`/${spreadsheetId}?fields=sheets.properties`);
+  const have = Object.fromEntries(meta.sheets.map(s => [s.properties.title, s.properties.sheetId]));
+  const missing = WANT_TABS.filter(t => !(t in have));
+  if (missing.length) {
+    const res = await sheetsApi(`/${spreadsheetId}:batchUpdate`, { method: 'POST', body: {
+      requests: missing.map(title => ({ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } })),
+    }});
+    res.replies.forEach((rep, i) => { have[missing[i]] = rep.addSheet.properties.sheetId; });
+  }
+
+  // Replace the contents of the four tabs (other tabs you add are left alone)
+  await sheetsApi(`/${spreadsheetId}/values:batchClear`, { method: 'POST',
+    body: { ranges: WANT_TABS.map(t => `'${t}'!A:Z`) } });
+  const stamp = new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  await sheetsApi(`/${spreadsheetId}/values:batchUpdate`, { method: 'POST', body: {
+    valueInputOption: 'USER_ENTERED',
+    data: WANT_TABS.map(t => ({ range: `'${t}'!A1`, values: [list[t].header, ...list[t].rows] })),
+  }});
+
+  // Formatting: bold header, filters, currency columns, column widths, update note
+  const requests = [];
+  for (const t of WANT_TABS) {
+    const sheetId = have[t], cols = list[t].header.length, rows = list[t].rows.length + 1;
+    requests.push(
+      { clearBasicFilter: { sheetId } },
+      { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } },
+      { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: cols },
+          cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: .9, green: .92, blue: .95 } } },
+          fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
+      { setBasicFilter: { filter: { range: { sheetId, startRowIndex: 0, endRowIndex: rows, startColumnIndex: 0, endColumnIndex: cols } } } },
+      ...list[t].money.map(c => ({ repeatCell: { range: { sheetId, startRowIndex: 1, endRowIndex: rows, startColumnIndex: c, endColumnIndex: c + 1 },
+          cell: { userEnteredFormat: { numberFormat: { type: 'CURRENCY', pattern: '$#,##0.00' } } }, fields: 'userEnteredFormat.numberFormat' } })),
+      { autoResizeDimensions: { dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: cols } } },
+      { updateCells: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 1 },
+          rows: [{ values: [{ note: `Updated ${stamp} · ${label}` }] }], fields: 'note' } },
+    );
+  }
+  await sheetsApi(`/${spreadsheetId}:batchUpdate`, { method: 'POST', body: { requests } });
+}
+
+// ---- Export dialog --------------------------------------------------------------
+function openSheetModal() {
+  const premier = PREMIER_SETS();
+  document.getElementById('sheet-premier-sets').textContent = premier.join(', ');
+  const existing = loadSheetId();
+  document.getElementById('sheet-target-row').hidden = !existing;
+  document.getElementById('sheet-new').checked = false;
+  updateSheetPreview();
+  document.getElementById('sheet-status').textContent = '';
+  document.getElementById('sheet-open').hidden = true;
+  document.getElementById('sheet-go').disabled = false;
+  document.getElementById('sheet-modal').hidden = false;
+  document.getElementById('sheet-go').focus();
+}
+function closeSheetModal() { document.getElementById('sheet-modal').hidden = true; document.getElementById('dl-btn').focus(); }
+function updateSheetPreview() {
+  const premierOnly = document.getElementById('sheet-scope-premier').checked;
+  const list = buildWantList({ premierOnly });
+  document.getElementById('sheet-preview').textContent =
+    WANT_TABS.map(t => `${t}: ${list[t].rows.length.toLocaleString()}`).join(' · ');
+  const createNew = !loadSheetId() || document.getElementById('sheet-new').checked;
+  document.getElementById('sheet-go').textContent = createNew ? 'Create sheet' : 'Update sheet';
+}
+
+async function exportWantSheet() {
+  const status = document.getElementById('sheet-status');
+  const go = document.getElementById('sheet-go');
+  if (!GOOGLE_CLIENT_ID) {
+    status.innerHTML = 'Google Sheets isn\'t connected yet: the tracker needs a Google Client ID. See the setup notes at the top of the Google Sheets section in <code>index.html</code>.';
+    return;
+  }
+  if (location.protocol === 'file:') {
+    status.textContent = 'Google sign-in only works on the hosted site, not when the file is opened from your computer.';
+    return;
+  }
+  const premierOnly = document.getElementById('sheet-scope-premier').checked;
+  const list = buildWantList({ premierOnly });
+  const label = premierOnly ? `Premier-legal: ${PREMIER_SETS().join(', ')}` : 'All sets';
+  let created = false;
+  go.disabled = true;
+  try {
+    status.textContent = 'Signing in to Google…';
+    await getGoogleToken();
+    let id = document.getElementById('sheet-new').checked ? null : loadSheetId();
+    status.textContent = id ? 'Updating your sheet…' : 'Creating your sheet…';
+    if (!id) { id = await createWantSheet(); created = true; }
+    try {
+      await writeWantList(id, list, label);
+    } catch (e) {
+      if (e.status !== 404 && e.status !== 403) throw e;
+      // The remembered sheet was deleted or isn't accessible: start a fresh one
+      forgetSheetId();
+      status.textContent = 'Your previous sheet is gone; creating a new one…';
+      id = await createWantSheet(); created = true;
+      await writeWantList(id, list, label);
+    }
+    const url = `https://docs.google.com/spreadsheets/d/${id}/edit`;
+    status.innerHTML = `✓ Want list ${created ? 'created' : 'updated'} (${label}). ` +
+      `To share it, open the sheet → Share → General access → <b>Anyone with the link</b> (Viewer). The link stays the same each update.`;
+    const open = document.getElementById('sheet-open');
+    open.href = url; open.hidden = false;
+    document.getElementById('sheet-target-row').hidden = false;
+    document.getElementById('sheet-new').checked = false;
+    updateSheetPreview();
+  } catch (e) {
+    console.error(e);
+    status.textContent = `Couldn't write the sheet: ${e.message}`;
+  } finally {
+    go.disabled = false;
+  }
 }
 
 // ── TCGplayer prices (via tcgcsv.com, a free daily mirror of TCGplayer data) ──
@@ -2405,7 +2627,12 @@ dropzone.addEventListener('drop', e => {
 });
 fileInput.addEventListener('change', () => { handleFiles(fileInput.files); fileInput.value = ''; });
 
-document.getElementById('dl-btn').addEventListener('click', openInSheets);
+document.getElementById('dl-btn').addEventListener('click', openSheetModal);
+document.getElementById('sheet-close').addEventListener('click', closeSheetModal);
+document.getElementById('sheet-go').addEventListener('click', exportWantSheet);
+document.getElementById('sheet-modal').addEventListener('click', e => { if (e.target.id === 'sheet-modal') closeSheetModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('sheet-modal').hidden) closeSheetModal(); });
+['sheet-scope-all', 'sheet-scope-premier', 'sheet-new'].forEach(id => document.getElementById(id).addEventListener('change', updateSheetPreview));
 
 document.getElementById('buy-btn').addEventListener('click', openBuyModal);
 document.getElementById('buy-close').addEventListener('click', closeBuyModal);
