@@ -452,6 +452,16 @@
   .prog-bar { width: 100%; height: 4px; background: var(--border); border-radius: 2px; margin-top: 4px; }
   .prog-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .5s ease; }
   .prog-fill.complete { background: var(--green); }
+  /* X-wing riding the leading edge of each progress bar (40x36 image shown at 20x18) */
+  .prog-bar { position: relative; margin: 9px 10px 7px 0; }   /* room for the 18px ship around a 4px bar */
+  .prog-fill { position: relative; }
+  .prog-fill::after {
+    content: ''; position: absolute; right: -10px; top: 50%;
+    width: 20px; height: 18px; transform: translateY(-50%);
+    background: url("data:image/png;base64,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") center / contain no-repeat;
+    filter: drop-shadow(0 0 2px rgba(0,0,0,.6));
+    pointer-events: none;
+  }
 
   /* Set summary table */
   .set-tbl { width: 100%; border-collapse: collapse; }
@@ -624,9 +634,10 @@ const SETS = [
   { code:'LOF', name:'Legends of the Force',     foil:'name',   prestige:true,  op:['LOFP'],          opFoil:'name',   color:'#1aace0', text:'#4dcdf0', alpha:[.15,.5] },
   { code:'SEC', name:'Secrets of Power',         foil:'name',   prestige:true,  op:['SECP'],          opFoil:'name',   color:'#8b2fc9', text:'#c47eef' },
   { code:'LAW', name:'A Lawless Time',           foil:'none',   prestige:true,  op:['LAWP'],          opFoil:'name',   color:'#f26a00', text:'#f59040', alpha:[.15,.5] },
-  { code:'ASH', name:'Ashes of the Empire',      foil:'none',   prestige:true,  op:['ASHP'],          opFoil:'name',   color:'#5A6E88', text:'#B4C3D8' },
-  { code:'HMW', name:'Homeworld',                foil:'none',   prestige:true,  op:['HMWP'],          opFoil:'name',   color:'#128843', text:'#4FD68A' },
-
+  { code:'ASH', name:'Ashes of the Empire',      foil:'none',   prestige:true,  op:['ASHP'],          opFoil:'name',   color:'#5a6e88', text:'#b4c3d8' },
+  // HMW: code and foil/OP rules are best guesses until the set is in SWUDB exports.
+  // Add its OP set code (likely 'HMWP') to op:[] once OP cards appear.
+  { code:'HMW', name:'Homeworlds',               foil:'none',   prestige:true,  op:[],                opFoil:'name',   color:'#128843', text:'#4fd68a' },
 ];
 
 // Promo / prize sets in SWUDB exports that this tracker deliberately skips
