@@ -1631,7 +1631,7 @@ function renderSummary() {
 // One-time setup: create a Google Cloud OAuth client (Web application) whose
 // "Authorized JavaScript origins" include this site's address, and paste its
 // Client ID below. The ID is public by design; it's safe to keep in this file.
-const GOOGLE_CLIENT_ID = '789361156613-in90b190re86sk166d40hetp9hbnotqo.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '';
 const SHEETS_SCOPE     = 'https://www.googleapis.com/auth/drive.file';  // only files this app creates
 const SHEET_ID_KEY     = 'swuTracker.wantSheetId.v1';
 const SHEET_TITLE      = 'SWU Want List';
@@ -1683,27 +1683,36 @@ function buildWantList({ premierOnly }) {
     .filter(r => legal.has(r.set) && r.status !== 'Complete' && !r.isUnknown)
     .sort((a, b) => (setIdx[a.set] - setIdx[b.set]) || (OP_SET_ORDER.indexOf(a.opSet) - OP_SET_ORDER.indexOf(b.opSet)) || (a.numInt - b.numInt));
 
+  // Column roles drive the sheet styling: set chips, rarity chips, centered
+  // numbers, currency, card names linked to TCGplayer.
+  const num  = r => parseInt(String(r.number).replace(/\D/g, ''), 10) || '';
+  const link = r => {
+    if (!r.tcgUrl) return r.name;
+    const q = v => String(v).replace(/"/g, '""');
+    return `=HYPERLINK("${q(r.tcgUrl)}","${q(r.name)}")`;
+  };
+  const C = (h, w, role) => ({ h, w, role });
   return {
     'Base Cards': {
-      header: ['Set', '#', 'Card Name', 'Rarity', 'Type', 'Qty Needed', 'Price Each', 'Line Total'],
-      money: [6, 7],
-      rows: base.map((r, i) => [r.set, r.number.padStart(3, '0'), r.name, r.rarity, r.type, r.need, price(r),
+      cols: [C('Set', 64, 'set'), C('#', 52, 'num'), C('Card Name', 340, 'name'), C('Rarity', 104, 'rarity'),
+             C('Type', 96, 'text'), C('Qty Needed', 96, 'qty'), C('Price Each', 100, 'money'), C('Line Total', 104, 'total')],
+      rows: base.map((r, i) => [r.set, num(r), link(r), r.rarity, r.type, r.need, price(r),
                                 r.price != null ? `=F${i + 2}*G${i + 2}` : '']),
     },
     'Prestige': {
-      header: ['Set', '#', 'Card Name', 'Rarity', 'Qty Needed', 'Price'],
-      money: [5],
-      rows: prestige.map(r => [r.set, String(r.number).padStart(3, '0'), r.name, r.rarity, 1, price(r)]),
+      cols: [C('Set', 64, 'set'), C('#', 60, 'num'), C('Card Name', 340, 'name'), C('Rarity', 104, 'rarity'),
+             C('Qty Needed', 96, 'qty'), C('Price', 100, 'total')],
+      rows: prestige.map(r => [r.set, num(r), link(r), r.rarity, 1, price(r)]),
     },
     'Organized Play': {
-      header: ['Set', 'Kit', '#', 'Card Name', 'Rarity', 'Qty Needed'],
-      money: [],
-      rows: op.map(r => [r.set, OP_KIT_NAME(r.opSet), r.number, r.name, r.rarity, 1]),
+      cols: [C('Set', 64, 'set'), C('Kit', 120, 'kit'), C('#', 52, 'num'), C('Card Name', 340, 'name'),
+             C('Rarity', 104, 'rarity'), C('Qty Needed', 96, 'qty')],
+      rows: op.map(r => [r.set, OP_KIT_NAME(r.opSet), num(r), r.name, r.rarity, 1]),
     },
     'Hyperspace': {
-      header: ['Set', '#', 'Card Name', 'Rarity', 'Qty Needed', 'Price'],
-      money: [5],
-      rows: hyperspace.map(r => [r.set, String(r.number).padStart(3, '0'), r.name, r.rarity, 1, price(r)]),
+      cols: [C('Set', 64, 'set'), C('#', 60, 'num'), C('Card Name', 340, 'name'), C('Rarity', 104, 'rarity'),
+             C('Qty Needed', 96, 'qty'), C('Price', 100, 'total')],
+      rows: hyperspace.map(r => [r.set, num(r), link(r), r.rarity, 1, price(r)]),
     },
   };
 }
@@ -1770,46 +1779,155 @@ async function createWantSheet() {
   return s.spreadsheetId;
 }
 
-async function writeWantList(spreadsheetId, list, label) {
-  // Make sure all four tabs exist (they may have been renamed or deleted)
-  const meta = await sheetsApi(`/${spreadsheetId}?fields=sheets.properties`);
-  const have = Object.fromEntries(meta.sheets.map(s => [s.properties.title, s.properties.sheetId]));
+// ---- Sheet styling (matches the tracker's colour scheme) ------------------------
+const SHEET_THEME = {
+  font: 'Exo 2',
+  headerBg: '#181d2e', headerText: '#ffd700',          // tracker navy + gold
+  bandA: '#ffffff', bandB: '#f3f5fa',
+  footerBg: '#e6eaf3', footerLine: '#181d2e', ink: '#1c2233',
+  tabs: { 'Base Cards': '#3d7fff', 'Prestige': '#9b59b6', 'Organized Play': '#ffd700', 'Hyperspace': '#1aace0' },
+  rarity: {                                             // same as the tracker's rarity colours
+    Common:    { bg: '#c08a52', fg: '#ffffff' },
+    Uncommon:  { bg: '#c3c9d1', fg: '#1c2233' },
+    Rare:      { bg: '#e8c547', fg: '#1c2233' },
+    Legendary: { bg: '#4a9eff', fg: '#ffffff' },
+    Special:   { bg: '#000000', fg: '#ffffff' },
+  },
+};
+const rgb = hex => {
+  const h = hex.replace('#', '');
+  return { red: parseInt(h.slice(0, 2), 16) / 255, green: parseInt(h.slice(2, 4), 16) / 255, blue: parseInt(h.slice(4, 6), 16) / 255 };
+};
+// Pick white or dark text for a fill, whichever has more contrast
+function luminance(hex) {
+  const lin = v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const { red, green, blue } = rgb(hex);
+  return 0.2126 * lin(red) + 0.7152 * lin(green) + 0.0722 * lin(blue);
+}
+function inkFor(hex) {
+  const L = luminance(hex), Ld = luminance(SHEET_THEME.ink);
+  const vsWhite = 1.05 / (L + 0.05), vsDark = (L + 0.05) / (Ld + 0.05);
+  return vsWhite >= vsDark ? '#ffffff' : SHEET_THEME.ink;
+}
+function chipRule(sheetId, col, rows, value, bg, fg) {
+  return { addConditionalFormatRule: { index: 0, rule: {
+    ranges: [{ sheetId, startRowIndex: 1, endRowIndex: rows, startColumnIndex: col, endColumnIndex: col + 1 }],
+    booleanRule: {
+      condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: value }] },
+      format: { backgroundColor: rgb(bg), textFormat: { foregroundColor: rgb(fg), bold: true } },
+    },
+  } } };
+}
+
+async function writeWantList(spreadsheetId, list, label, opts = {}) {
+  const T = { ...SHEET_THEME, ...(opts.font ? { font: opts.font } : {}) };
+  // Current tabs, plus old styling rules and bands to replace
+  const meta = await sheetsApi(`/${spreadsheetId}?fields=sheets(properties(sheetId,title),conditionalFormats,bandedRanges(bandedRangeId))`);
+  const have = {}, oldRules = {}, oldBands = [];
+  for (const sh of meta.sheets) {
+    have[sh.properties.title] = sh.properties.sheetId;
+    oldRules[sh.properties.title] = (sh.conditionalFormats || []).length;
+    if (WANT_TABS.includes(sh.properties.title)) (sh.bandedRanges || []).forEach(b => oldBands.push(b.bandedRangeId));
+  }
   const missing = WANT_TABS.filter(t => !(t in have));
   if (missing.length) {
     const res = await sheetsApi(`/${spreadsheetId}:batchUpdate`, { method: 'POST', body: {
-      requests: missing.map(title => ({ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } })),
+      requests: missing.map(title => ({ addSheet: { properties: { title } } })),
     }});
-    res.replies.forEach((rep, i) => { have[missing[i]] = rep.addSheet.properties.sheetId; });
+    res.replies.forEach((rep, i) => { have[missing[i]] = rep.addSheet.properties.sheetId; oldRules[missing[i]] = 0; });
   }
 
-  // Replace the contents of the four tabs (other tabs you add are left alone)
+  // Values: header + rows (+ a totals row)
   await sheetsApi(`/${spreadsheetId}/values:batchClear`, { method: 'POST',
     body: { ranges: WANT_TABS.map(t => `'${t}'!A:Z`) } });
-  const stamp = new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const colLetter = i => String.fromCharCode(65 + i);
+  const footerFor = t => {
+    const { cols, rows } = list[t], n = rows.length, last = n + 1;
+    if (!n) return cols.map((c, i) => (c.role === 'name' ? 'Nothing needed here, this tab is complete!' : ''));
+    return cols.map((c, i) =>
+      c.role === 'name' ? `${n.toLocaleString()} card${n === 1 ? '' : 's'}`
+      : c.role === 'qty' || c.role === 'total' ? `=SUM(${colLetter(i)}2:${colLetter(i)}${last})`
+      : i === 0 ? 'TOTAL' : '');
+  };
   await sheetsApi(`/${spreadsheetId}/values:batchUpdate`, { method: 'POST', body: {
     valueInputOption: 'USER_ENTERED',
-    data: WANT_TABS.map(t => ({ range: `'${t}'!A1`, values: [list[t].header, ...list[t].rows] })),
+    data: WANT_TABS.map(t => ({ range: `'${t}'!A1`,
+      values: [list[t].cols.map(c => c.h), ...list[t].rows, footerFor(t)] })),
   }});
 
-  // Formatting: bold header, filters, currency columns, column widths, update note
-  const requests = [];
+  const stamp = new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const requests = oldBands.map(bandedRangeId => ({ deleteBanding: { bandedRangeId } }));
   for (const t of WANT_TABS) {
-    const sheetId = have[t], cols = list[t].header.length, rows = list[t].rows.length + 1;
+    const sheetId = have[t];
+    const { cols } = list[t];
+    const n = list[t].rows.length, dataEnd = n + 1, footer = n + 1;      // footer row index
+    const ncol = cols.length;
+    const range = (r0, r1, c0 = 0, c1 = ncol) => ({ sheetId, startRowIndex: r0, endRowIndex: r1, startColumnIndex: c0, endColumnIndex: c1 });
+    const colsWith = role => cols.map((c, i) => (c.role === role ? i : -1)).filter(i => i >= 0);
+
+    // Remove previous rules (highest index first) and all old formatting
+    for (let i = (oldRules[t] || 0) - 1; i >= 0; i--) requests.push({ deleteConditionalFormatRule: { sheetId, index: i } });
     requests.push(
       { clearBasicFilter: { sheetId } },
-      { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } },
-      { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: cols },
-          cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: .9, green: .92, blue: .95 } } },
-          fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
-      { setBasicFilter: { filter: { range: { sheetId, startRowIndex: 0, endRowIndex: rows, startColumnIndex: 0, endColumnIndex: cols } } } },
-      ...list[t].money.map(c => ({ repeatCell: { range: { sheetId, startRowIndex: 1, endRowIndex: rows, startColumnIndex: c, endColumnIndex: c + 1 },
-          cell: { userEnteredFormat: { numberFormat: { type: 'CURRENCY', pattern: '$#,##0.00' } } }, fields: 'userEnteredFormat.numberFormat' } })),
-      { autoResizeDimensions: { dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: cols } } },
-      { updateCells: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 1 },
-          rows: [{ values: [{ note: `Updated ${stamp} · ${label}` }] }], fields: 'note' } },
+      { repeatCell: { range: { sheetId }, cell: { userEnteredFormat: {} }, fields: 'userEnteredFormat' } },
+      { updateSheetProperties: { properties: { sheetId, tabColorStyle: { rgbColor: rgb(T.tabs[t]) },
+          gridProperties: { frozenRowCount: 1, hideGridlines: true } },
+          fields: 'tabColorStyle,gridProperties.frozenRowCount,gridProperties.hideGridlines' } },
+      // Whole table: font, vertical centring
+      { repeatCell: { range: range(0, footer + 1), cell: { userEnteredFormat: {
+          textFormat: { fontFamily: T.font, fontSize: 10, foregroundColor: rgb(T.ink) }, verticalAlignment: 'MIDDLE',
+          padding: { left: 6, right: 6, top: 3, bottom: 3 } } },
+          fields: 'userEnteredFormat(textFormat,verticalAlignment,padding)' } },
+      // Header: navy bar with gold lettering
+      { repeatCell: { range: range(0, 1), cell: { userEnteredFormat: {
+          backgroundColor: rgb(T.headerBg), horizontalAlignment: 'CENTER', verticalAlignment: 'MIDDLE',
+          textFormat: { fontFamily: T.font, fontSize: 10, bold: true, foregroundColor: rgb(T.headerText) } } },
+          fields: 'userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,textFormat)' } },
+      { updateDimensionProperties: { range: { sheetId, dimension: 'ROWS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 34 }, fields: 'pixelSize' } },
+      { updateDimensionProperties: { range: { sheetId, dimension: 'ROWS', startIndex: 1, endIndex: footer + 1 }, properties: { pixelSize: 26 }, fields: 'pixelSize' } },
+      ...cols.map((c, i) => ({ updateDimensionProperties: { range: { sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 }, properties: { pixelSize: c.w }, fields: 'pixelSize' } })),
+      // Footer: totals bar
+      { repeatCell: { range: range(footer, footer + 1), cell: { userEnteredFormat: {
+          backgroundColor: rgb(T.footerBg), textFormat: { fontFamily: T.font, fontSize: 10, bold: true, foregroundColor: rgb(T.ink) } } },
+          fields: 'userEnteredFormat(backgroundColor,textFormat)' } },
+      { updateBorders: { range: range(footer, footer + 1), top: { style: 'SOLID_MEDIUM', colorStyle: { rgbColor: rgb(T.footerLine) } } } },
     );
+    if (n) {
+      requests.push(
+        { addBanding: { bandedRange: { range: range(1, dataEnd), rowProperties: { firstBandColor: rgb(T.bandA), secondBandColor: rgb(T.bandB) } } } },
+        { setBasicFilter: { filter: { range: range(0, dataEnd) } } },
+      );
+    }
+    // Column formats
+    const fmt = (cs, userEnteredFormat, fields, r0 = 1, r1 = footer + 1) =>
+      cs.forEach(c => requests.push({ repeatCell: { range: range(r0, r1, c, c + 1), cell: { userEnteredFormat }, fields: `userEnteredFormat(${fields})` } }));
+    fmt([...colsWith('set'), ...colsWith('rarity'), ...colsWith('kit')], { horizontalAlignment: 'CENTER' }, 'horizontalAlignment', 1, dataEnd);
+    fmt(colsWith('num'), { horizontalAlignment: 'CENTER', numberFormat: { type: 'NUMBER', pattern: '000' } }, 'horizontalAlignment,numberFormat', 1, dataEnd);
+    fmt(colsWith('qty'), { horizontalAlignment: 'CENTER', textFormat: { fontFamily: T.font, fontSize: 10, bold: true, foregroundColor: rgb(T.ink) } }, 'horizontalAlignment,textFormat');
+    fmt([...colsWith('money'), ...colsWith('total')], { horizontalAlignment: 'RIGHT', numberFormat: { type: 'CURRENCY', pattern: '$#,##0.00' } }, 'horizontalAlignment,numberFormat');
+    fmt(colsWith('total'), { horizontalAlignment: 'RIGHT', numberFormat: { type: 'CURRENCY', pattern: '$#,##0.00' },
+      textFormat: { fontFamily: T.font, fontSize: 10, bold: true, foregroundColor: rgb(T.ink) } }, 'horizontalAlignment,numberFormat,textFormat', 1, dataEnd);
+    // Header cells over centred / right-aligned columns match their column
+    fmt([...colsWith('money'), ...colsWith('total')], { horizontalAlignment: 'RIGHT' }, 'horizontalAlignment', 0, 1);
+    fmt(colsWith('name'), { horizontalAlignment: 'LEFT' }, 'horizontalAlignment', 0, 1);
+
+    // Colour chips: sets in their tracker colours, rarities in theirs (kept when sorted/filtered)
+    if (n) {
+      for (const c of colsWith('set')) for (const x of SETS) requests.push(chipRule(sheetId, c, dataEnd, x.code, x.color, inkFor(x.color)));
+      for (const c of colsWith('rarity')) for (const [name, { bg, fg }] of Object.entries(T.rarity)) requests.push(chipRule(sheetId, c, dataEnd, name, bg, fg));
+    }
+    requests.push({ updateCells: { range: range(0, 1, 0, 1), rows: [{ values: [{ note: `Updated ${stamp} · ${label}` }] }], fields: 'note' } });
   }
-  await sheetsApi(`/${spreadsheetId}:batchUpdate`, { method: 'POST', body: { requests } });
+  // Styling is cosmetic: if Google rejects it, retry with a standard font, then
+  // fall back to plain data rather than failing the whole export
+  try {
+    await sheetsApi(`/${spreadsheetId}:batchUpdate`, { method: 'POST', body: { requests } });
+  } catch (e) {
+    if (e.status !== 400) throw e;
+    console.warn('[SWU tracker] sheet styling rejected:', e.message);
+    if (!opts.font) return writeWantList(spreadsheetId, list, label, { font: 'Arial' });
+    writeWantList.lastStyleError = e.message;
+  }
 }
 
 // ---- Export dialog --------------------------------------------------------------
@@ -1852,6 +1970,7 @@ async function exportWantSheet() {
   const label = premierOnly ? `Premier-legal: ${PREMIER_SETS().join(', ')}` : 'All sets';
   let created = false;
   go.disabled = true;
+  writeWantList.lastStyleError = null;
   try {
     status.textContent = 'Signing in to Google…';
     await getGoogleToken();
@@ -1870,6 +1989,7 @@ async function exportWantSheet() {
     }
     const url = `https://docs.google.com/spreadsheets/d/${id}/edit`;
     status.innerHTML = `✓ Want list ${created ? 'created' : 'updated'} (${label}). ` +
+      (writeWantList.lastStyleError ? `(Colours couldn't be applied: ${writeWantList.lastStyleError}) ` : '') +
       `To share it, open the sheet → Share → General access → <b>Anyone with the link</b> (Viewer). The link stays the same each update.`;
     const open = document.getElementById('sheet-open');
     open.href = url; open.hidden = false;
